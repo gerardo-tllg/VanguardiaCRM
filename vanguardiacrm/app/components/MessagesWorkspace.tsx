@@ -156,7 +156,7 @@ export default function MessagesWorkspace() {
                       {conversation.lastMessageAt}
                     </div>
                     {conversation.unreadCount > 0 && (
-                      <div className="mt-2 inline-flex min-w-[20px] justify-center rounded-full bg-[#4b0a06] px-2 py-0.5 text-xs text-white">
+                      <div className="mt-2 inline-flex min-w-5 justify-center rounded-full bg-[#4b0a06] px-2 py-0.5 text-xs text-white">
                         {conversation.unreadCount}
                       </div>
                     )}
@@ -191,7 +191,7 @@ export default function MessagesWorkspace() {
           </div>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto bg-[#fafafa] p-5 min-h-[420px]">
+        <div className="flex-1 space-y-4 overflow-y-auto bg-[#fafafa] p-5 min-h-105">
           {thread.map((message) => {
             const outbound = message.direction === "outbound";
 
