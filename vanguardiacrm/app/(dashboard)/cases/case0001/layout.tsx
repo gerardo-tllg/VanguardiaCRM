@@ -1,5 +1,5 @@
 import CaseHeader from "../../../components/CaseHeader";
-import CaseSidebar from "../../../components/CaseSidebar";
+import CaseTabs from "../../../components/CaseTabs";
 import CaseNotesPanel from "../../../components/CaseNotesPanel";
 
 export default function CaseLayout({
@@ -22,9 +22,9 @@ export default function CaseLayout({
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f5f5]">
       <CaseHeader caseData={mockCase} />
+      <CaseTabs caseId={mockCase.id} />
 
       <div className="flex flex-1 gap-6 p-6">
-        <CaseSidebar caseId={mockCase.id} />
         <main className="min-w-0 flex-1">{children}</main>
         <CaseNotesPanel />
       </div>

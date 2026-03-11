@@ -1,19 +1,19 @@
 export default function CaseNotesPanel() {
   const notes = [
     {
-      id: "note_001",
+      id: "1",
       author: "Stephanie Salas",
       time: "03/11/2026 11:50 AM",
       body: "Uploaded document LOR.pdf.",
     },
     {
-      id: "note_002",
+      id: "2",
       author: "Stephanie Salas",
       time: "03/11/2026 11:50 AM",
       body: "Reviewed and attached document LOR.pdf.",
     },
     {
-      id: "note_003",
+      id: "3",
       author: "Stephanie Salas",
       time: "03/11/2026 11:47 AM",
       body: "Updated RedPoint County Mutual on treatment status.",
@@ -21,7 +21,7 @@ export default function CaseNotesPanel() {
   ];
 
   return (
-    <aside className="w-[340px] shrink-0">
+    <aside className="w-[300px] shrink-0">
       <div className="space-y-4">
         <div className="rounded-lg border border-[#e5e5e5] bg-white px-5 py-4">
           <div className="flex items-center justify-between">
@@ -40,7 +40,7 @@ export default function CaseNotesPanel() {
             <input
               type="text"
               placeholder="Search"
-              className="w-full rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
+              className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm outline-none focus:border-[#4b0a06]"
             />
           </div>
 
