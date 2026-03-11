@@ -1,8 +1,8 @@
-import Sidebar from "../../components/Sidebar";
-import Topbar from "../../components/Topbar";
-import CollectSubnav from "../../components/CollectSubnav";
-import FormsTemplatesTable from "../../components/FormsTemplatesTable";
-import FormsSubmissionsTable from "../../components/FormsSubmissionsTable";
+import Sidebar from "../../../components/Sidebar";
+import Topbar from "../../../components/Topbar";
+import CollectSubnav from "../../../components/CollectSubnav";
+import FormsTemplatesTable from "../../../components/FormsTemplatesTable";
+import FormsSubmissionsTable from "../../../components/FormsSubmissionsTable";
 
 type SearchParams = Promise<{ view?: string }>;
 
