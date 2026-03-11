@@ -3,14 +3,6 @@ import Link from "next/link";
 export default function AutomationsPage() {
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <Link
-          href="/projects"
-          className="inline-flex items-center rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08]"
-        >
-          ← Return to Projects
-        </Link>
-      </div>
 
       <div className="mb-6">
         <h1 className="text-4xl font-bold text-[#2b2b2b]">Automations</h1>
