@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data: lead, error: leadError } = await supabaseAdmin
       .from("leads")
       .insert({
         client_name: payload.client_name,
@@ -45,15 +45,27 @@ export async function POST(req: Request) {
       .select()
       .single();
 
-    if (error) {
-      console.error("Supabase insert error:", error);
+    if (leadError) {
+      console.error("Supabase insert error:", leadError);
       return NextResponse.json(
         { error: "Failed to create lead" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, lead: data }, { status: 200 });
+    if (payload.ai_summary && lead?.id) {
+      const { error: noteError } = await supabaseAdmin.from("lead_notes").insert({
+        lead_id: lead.id,
+        author_email: "AI Intake System",
+        body: payload.ai_summary,
+      });
+
+      if (noteError) {
+        console.error("Failed to create AI summary note:", noteError);
+      }
+    }
+
+    return NextResponse.json({ success: true, lead }, { status: 200 });
   } catch (error) {
     console.error("Webhook error:", error);
     return NextResponse.json(
