@@ -1,0 +1,64 @@
+import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase/server";
+
+type ZapierLeadPayload = {
+  client_name?: string;
+  phone?: string;
+  email?: string;
+  accident_date?: string;
+  accident_type?: string;
+  injuries?: string;
+  ai_summary?: string;
+  lang?: string;
+  utm_source?: string;
+  utm_campaign?: string;
+  [key: string]: unknown;
+};
+
+export async function POST(req: Request) {
+  try {
+    const payload = (await req.json()) as ZapierLeadPayload;
+
+    if (!payload.client_name) {
+      return NextResponse.json(
+        { error: "client_name is required" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("leads")
+      .insert({
+        client_name: payload.client_name,
+        phone: payload.phone ?? null,
+        email: payload.email ?? null,
+        accident_date: payload.accident_date ?? null,
+        accident_type: payload.accident_type ?? null,
+        injuries: payload.injuries ?? null,
+        ai_summary: payload.ai_summary ?? null,
+        lang: payload.lang ?? null,
+        utm_source: payload.utm_source ?? null,
+        utm_campaign: payload.utm_campaign ?? null,
+        raw_payload: payload,
+        status: "New",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      return NextResponse.json(
+        { error: "Failed to create lead" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, lead: data }, { status: 200 });
+  } catch (error) {
+    console.error("Webhook error:", error);
+    return NextResponse.json(
+      { error: "Invalid request payload" },
+      { status: 400 }
+    );
+  }
+}

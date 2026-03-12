@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-type LeadStatus =
+export type LeadStatus =
   | "New Intake"
   | "Under Review"
   | "Accepted"
@@ -10,7 +10,7 @@ type LeadStatus =
   | "Converted to Case"
   | "Archived";
 
-type IntakeLead = {
+export type IntakeLead = {
   id: string;
   clientName: string;
   phone: string;
@@ -30,79 +30,10 @@ type IntakeLead = {
   evidenceFiles: string[];
   status: LeadStatus;
   submittedAt: string;
+  lang?: string;
+  utmSource?: string;
+  utmCampaign?: string;
 };
-
-const initialLeads: IntakeLead[] = [
-  {
-    id: "lead_001",
-    clientName: "Carlos Cortez",
-    phone: "9566847014",
-    email: "",
-    source: "Direct Website",
-    priority: "Medium",
-    score: 70,
-    caseType: "Premises Liability",
-    dateOfIncident: "Last week / Mold issue began 3 months ago",
-    location: "La Estancia Apartments, Mercedes, Texas",
-    defendant: "La Estancia Apartments",
-    injuries: ["Pneumonia", "Difficulty breathing", "Pregnant spouse affected"],
-    treatment: "Emergency Room, Ongoing Treatment",
-    aiSummary:
-      "Mold exposure case involving pneumonia and breathing issues for client and 37-week pregnant wife after inadequate landlord remediation.",
-    aiRecommendation: "Accept",
-    strategyMemo:
-      "Strong premises liability case. Client reports notice to landlord, inadequate remediation, documented mold conditions, emergency treatment, and ongoing respiratory harm affecting both client and pregnant spouse.",
-    evidenceFiles: ["IMG_2564.png", "IMG_2563.png"],
-    status: "New Intake",
-    submittedAt: "03/05/2026 10:14 AM",
-  },
-  {
-    id: "lead_002",
-    clientName: "Angela Flores",
-    phone: "9565558744",
-    email: "angelaflores@email.com",
-    source: "AI Intake",
-    priority: "High",
-    score: 82,
-    caseType: "Motor Vehicle Accident",
-    dateOfIncident: "03/01/2026",
-    location: "McAllen, Texas",
-    defendant: "Unknown at intake",
-    injuries: ["Neck pain", "Back pain", "Headaches"],
-    treatment: "ER visit, chiropractic follow-up",
-    aiSummary:
-      "Rear-end collision with ongoing neck and back complaints. Early treatment started.",
-    aiRecommendation: "Accept",
-    strategyMemo:
-      "Likely viable MVA claim. Need police report, insurance information, and treatment progression.",
-    evidenceFiles: ["crash_photo_1.jpg"],
-    status: "Under Review",
-    submittedAt: "03/08/2026 2:03 PM",
-  },
-  {
-    id: "lead_003",
-    clientName: "Daniel Reyes",
-    phone: "9565556602",
-    email: "danielreyes@email.com",
-    source: "Referral",
-    priority: "Low",
-    score: 41,
-    caseType: "Personal Injury",
-    dateOfIncident: "12/15/2023",
-    location: "Edinburg, Texas",
-    defendant: "Unknown",
-    injuries: ["Minor soft tissue complaints"],
-    treatment: "Minimal treatment",
-    aiSummary:
-      "Older claim with minimal treatment and weaker damages profile.",
-    aiRecommendation: "Reject",
-    strategyMemo:
-      "Low-value claim with potential timing concerns and limited medical support.",
-    evidenceFiles: [],
-    status: "Rejected",
-    submittedAt: "03/07/2026 11:21 AM",
-  },
-];
 
 function getPriorityStyles(priority: IntakeLead["priority"]) {
   switch (priority) {
@@ -136,10 +67,36 @@ function getStatusStyles(status: LeadStatus) {
   }
 }
 
-export default function LeadsWorkspace() {
+function uiStatusToDbStatus(
+  status: LeadStatus
+): "New" | "Reviewed" | "Accepted" | "Rejected" | "Archived" {
+  switch (status) {
+    case "New Intake":
+      return "New";
+    case "Under Review":
+      return "Reviewed";
+    case "Accepted":
+      return "Accepted";
+    case "Rejected":
+      return "Rejected";
+    case "Archived":
+      return "Archived";
+    case "Converted to Case":
+      return "Accepted";
+    default:
+      return "New";
+  }
+}
+
+export default function LeadsWorkspace({
+  initialLeads,
+}: {
+  initialLeads: IntakeLead[];
+}) {
   const [leads, setLeads] = useState<IntakeLead[]>(initialLeads);
   const [selectedId, setSelectedId] = useState<string>(initialLeads[0]?.id ?? "");
   const [search, setSearch] = useState("");
+  const [savingStatus, setSavingStatus] = useState<string | null>(null);
 
   const filteredLeads = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -160,13 +117,46 @@ export default function LeadsWorkspace() {
     filteredLeads[0] ??
     null;
 
-  function updateLeadStatus(id: string, status: LeadStatus) {
-    setLeads((prev) => prev.map((lead) => (lead.id === id ? { ...lead, status } : lead)));
+  async function updateLeadStatus(id: string, status: LeadStatus) {
+    const previous = leads;
+
+    setSavingStatus(id);
+
+    setLeads((prev) =>
+      prev.map((lead) => (lead.id === id ? { ...lead, status } : lead))
+    );
+
+    try {
+      const res = await fetch(`/api/leads/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: uiStatusToDbStatus(status),
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        console.error("Lead status update failed:", result);
+        throw new Error(result?.error || "Failed to update lead status");
+      }
+    } catch (error) {
+      console.error(error);
+      setLeads(previous);
+      alert(
+        error instanceof Error ? error.message : "Failed to update lead status."
+      );
+    } finally {
+      setSavingStatus(null);
+    }
   }
 
   return (
     <div className="grid grid-cols-12 gap-6">
-      <div className="col-span-5 rounded-xl border border-[#e5e5e5] bg-white overflow-hidden">
+      <div className="col-span-5 overflow-hidden rounded-xl border border-[#e5e5e5] bg-white">
         <div className="border-b border-[#e5e5e5] p-4">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-lg font-semibold text-[#2b2b2b]">Intake Queue</h2>
@@ -189,10 +179,8 @@ export default function LeadsWorkspace() {
                 key={lead.id}
                 onClick={() => setSelectedId(lead.id)}
                 className={[
-                  "w-full text-left border-b border-[#eeeeee] p-4 transition",
-                  isSelected
-                    ? "bg-[#fcf8f7]"
-                    : "bg-white hover:bg-[#fcfaf9]",
+                  "w-full border-b border-[#eeeeee] p-4 text-left transition",
+                  isSelected ? "bg-[#fcf8f7]" : "bg-white hover:bg-[#fcfaf9]",
                 ].join(" ")}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -282,29 +270,33 @@ export default function LeadsWorkspace() {
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button
+                disabled={savingStatus === selectedLead.id}
                 onClick={() => updateLeadStatus(selectedLead.id, "Accepted")}
-                className="rounded-md bg-[#1f7a4d] px-4 py-2 text-sm font-medium text-white hover:bg-[#256f4a]"
+                className="rounded-md bg-[#1f7a4d] px-4 py-2 text-sm font-medium text-white hover:bg-[#256f4a] disabled:opacity-50"
               >
                 Accept Case
               </button>
 
               <button
+                disabled={savingStatus === selectedLead.id}
                 onClick={() => updateLeadStatus(selectedLead.id, "Rejected")}
-                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
               >
                 Reject Case
               </button>
 
               <button
+                disabled={savingStatus === selectedLead.id}
                 onClick={() => updateLeadStatus(selectedLead.id, "Converted to Case")}
-                className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08]"
+                className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
               >
                 Convert to Case
               </button>
 
               <button
+                disabled={savingStatus === selectedLead.id}
                 onClick={() => updateLeadStatus(selectedLead.id, "Archived")}
-                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:bg-[#f7f7f7]"
+                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:bg-[#f7f7f7] disabled:opacity-50"
               >
                 Archive
               </button>
@@ -312,22 +304,54 @@ export default function LeadsWorkspace() {
 
             <div className="mt-6 grid grid-cols-2 gap-4">
               <div className="rounded-lg border border-[#e5e5e5] bg-[#fcfcfc] p-4">
-                <h3 className="text-sm font-semibold text-[#2b2b2b]">Client Information</h3>
+                <h3 className="text-sm font-semibold text-[#2b2b2b]">
+                  Client Information
+                </h3>
                 <div className="mt-3 space-y-2 text-sm text-[#444444]">
-                  <div><span className="font-medium text-[#2b2b2b]">Name:</span> {selectedLead.clientName}</div>
-                  <div><span className="font-medium text-[#2b2b2b]">Phone:</span> {selectedLead.phone}</div>
-                  <div><span className="font-medium text-[#2b2b2b]">Email:</span> {selectedLead.email || "N/A"}</div>
-                  <div><span className="font-medium text-[#2b2b2b]">Submitted:</span> {selectedLead.submittedAt}</div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Name:</span>{" "}
+                    {selectedLead.clientName}
+                  </div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Phone:</span>{" "}
+                    {selectedLead.phone}
+                  </div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Email:</span>{" "}
+                    {selectedLead.email || "N/A"}
+                  </div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Submitted:</span>{" "}
+                    {selectedLead.submittedAt}
+                  </div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Language:</span>{" "}
+                    {selectedLead.lang || "N/A"}
+                  </div>
                 </div>
               </div>
 
               <div className="rounded-lg border border-[#e5e5e5] bg-[#fcfcfc] p-4">
-                <h3 className="text-sm font-semibold text-[#2b2b2b]">Incident Details</h3>
+                <h3 className="text-sm font-semibold text-[#2b2b2b]">
+                  Incident Details
+                </h3>
                 <div className="mt-3 space-y-2 text-sm text-[#444444]">
-                  <div><span className="font-medium text-[#2b2b2b]">Date of Incident:</span> {selectedLead.dateOfIncident}</div>
-                  <div><span className="font-medium text-[#2b2b2b]">Location:</span> {selectedLead.location}</div>
-                  <div><span className="font-medium text-[#2b2b2b]">Defendant:</span> {selectedLead.defendant}</div>
-                  <div><span className="font-medium text-[#2b2b2b]">Treatment:</span> {selectedLead.treatment}</div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Date of Incident:</span>{" "}
+                    {selectedLead.dateOfIncident}
+                  </div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Location:</span>{" "}
+                    {selectedLead.location}
+                  </div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Defendant:</span>{" "}
+                    {selectedLead.defendant}
+                  </div>
+                  <div>
+                    <span className="font-medium text-[#2b2b2b]">Treatment:</span>{" "}
+                    {selectedLead.treatment}
+                  </div>
                 </div>
               </div>
             </div>
@@ -355,12 +379,14 @@ export default function LeadsWorkspace() {
 
             <div className="mt-4 rounded-lg border border-[#e5e5e5] bg-[#fcfcfc] p-4">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-[#2b2b2b]">AI Strategy Memo</h3>
+                <h3 className="text-sm font-semibold text-[#2b2b2b]">
+                  AI Strategy Memo
+                </h3>
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
                     selectedLead.aiRecommendation === "Accept"
-                      ? "bg-[#ecf8f1] text-[#1f7a4d] border border-[#b9e4cf]"
-                      : "bg-[#f3f3f3] text-[#6b6b6b] border border-[#dddddd]"
+                      ? "border border-[#b9e4cf] bg-[#ecf8f1] text-[#1f7a4d]"
+                      : "border border-[#dddddd] bg-[#f3f3f3] text-[#6b6b6b]"
                   }`}
                 >
                   Recommendation: {selectedLead.aiRecommendation}
@@ -373,7 +399,25 @@ export default function LeadsWorkspace() {
             </div>
 
             <div className="mt-4 rounded-lg border border-[#e5e5e5] bg-[#fcfcfc] p-4">
-              <h3 className="text-sm font-semibold text-[#2b2b2b]">Evidence Files</h3>
+              <h3 className="text-sm font-semibold text-[#2b2b2b]">
+                Attribution
+              </h3>
+              <div className="mt-3 space-y-2 text-sm text-[#444444]">
+                <div>
+                  <span className="font-medium text-[#2b2b2b]">UTM Source:</span>{" "}
+                  {selectedLead.utmSource || "N/A"}
+                </div>
+                <div>
+                  <span className="font-medium text-[#2b2b2b]">UTM Campaign:</span>{" "}
+                  {selectedLead.utmCampaign || "N/A"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-[#e5e5e5] bg-[#fcfcfc] p-4">
+              <h3 className="text-sm font-semibold text-[#2b2b2b]">
+                Evidence Files
+              </h3>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {selectedLead.evidenceFiles.length > 0 ? (
@@ -392,7 +436,9 @@ export default function LeadsWorkspace() {
             </div>
           </div>
         ) : (
-          <div className="p-6 text-sm text-[#6b6b6b]">Select a lead to review.</div>
+          <div className="p-6 text-sm text-[#6b6b6b]">
+            Select a lead to review.
+          </div>
         )}
       </div>
     </div>

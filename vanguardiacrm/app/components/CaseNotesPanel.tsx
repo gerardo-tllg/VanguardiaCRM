@@ -21,7 +21,7 @@ export default function CaseNotesPanel() {
   ];
 
   return (
-    <aside className="w-[300px] shrink-0">
+    <aside className="w-75 shrink-0">
       <div className="space-y-4">
         <div className="rounded-lg border border-[#e5e5e5] bg-white px-5 py-4">
           <div className="flex items-center justify-between">
