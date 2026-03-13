@@ -2,23 +2,22 @@ import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
 export default auth((req) => {
+  const pathname = req.nextUrl.pathname;
   const isLoggedIn = !!req.auth;
 
-  const protectedRoutes = [
-    "/dashboard",
-    "/projects",
-    "/cases",
-    "/leads",
-    "/collect",
-    "/reports",
-    "/ai-receptionist",
-  ];
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico";
 
-  const isProtected = protectedRoutes.some((route) =>
-    req.nextUrl.pathname.startsWith(route)
-  );
+  if (isPublicRoute) {
+    return NextResponse.next();
+  }
 
-  if (!isLoggedIn && isProtected) {
+  if (!isLoggedIn) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -26,13 +25,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: [
-    "/dashboard/:path*",
-    "/projects/:path*",
-    "/cases/:path*",
-    "/leads/:path*",
-    "/collect/:path*",
-    "/reports/:path*",
-    "/ai-receptionist/:path*",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
