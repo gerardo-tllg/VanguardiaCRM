@@ -2,9 +2,24 @@ import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
 export default auth((req) => {
-  if (!req.auth) {
-    const loginUrl = new URL("/login", req.nextUrl.origin);
-    return NextResponse.redirect(loginUrl);
+  const isLoggedIn = !!req.auth;
+
+  const protectedRoutes = [
+    "/dashboard",
+    "/projects",
+    "/cases",
+    "/leads",
+    "/collect",
+    "/reports",
+    "/ai-receptionist",
+  ];
+
+  const isProtected = protectedRoutes.some((route) =>
+    req.nextUrl.pathname.startsWith(route)
+  );
+
+  if (!isLoggedIn && isProtected) {
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   return NextResponse.next();
@@ -14,15 +29,10 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/projects/:path*",
+    "/cases/:path*",
     "/leads/:path*",
-    "/contacts/:path*",
-    "/messages/:path*",
     "/collect/:path*",
     "/reports/:path*",
-    "/automations/:path*",
-    "/calendar/:path*",
-    "/company-settings/:path*",
-    "/my-account/:path*",
-    "/cases/:path*",
+    "/ai-receptionist/:path*",
   ],
 };
