@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "../../../../lib/supabase/server";
 import LeadDetailView from "../../../components/LeadDetailView";
