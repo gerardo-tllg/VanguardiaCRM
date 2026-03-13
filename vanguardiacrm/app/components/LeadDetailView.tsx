@@ -99,7 +99,7 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
     : [];
 
   return (
-    <div className="mx-auto w-full max-w-[1500px]">
+    <div className="mx-auto w-full max-w-375">
       <div className="mb-6 flex flex-col gap-4 rounded-xl border border-[#e5e5e5] bg-white p-6 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <Link
