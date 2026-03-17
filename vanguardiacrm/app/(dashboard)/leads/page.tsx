@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import LeadsWorkspace from "../../components/LeadsWorkspace";
 import { supabaseAdmin } from "../../../lib/supabase/server";
 import type { LeadRecord } from "../../../types/leads";

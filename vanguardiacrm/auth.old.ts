@@ -15,20 +15,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async signIn({ profile }) {
       const email = profile?.email;
-      const emailVerified = "email_verified" in (profile ?? {}) ? Boolean((profile as { email_verified?: boolean }).email_verified) : false;
+      const emailVerified =
+        profile && "email_verified" in profile
+          ? Boolean((profile as { email_verified?: boolean }).email_verified)
+          : false;
 
       if (!email || !emailVerified) {
         return false;
       }
 
-      // Restrict to your firm domain.
-      return email.toLowerCase().endsWith("@fernandojlopez.com");
-    },
-    async session({ session, token }) {
-      if (session.user && token.email) {
-        session.user.email = token.email;
-      }
-      return session;
+      return true;
     },
   },
   pages: {

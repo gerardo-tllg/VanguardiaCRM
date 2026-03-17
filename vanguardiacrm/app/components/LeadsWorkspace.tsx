@@ -1,4 +1,5 @@
 "use client";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -154,6 +155,42 @@ export default function LeadsWorkspace({
     }
   }
 
+  async function convertLeadToCase(id: string) {
+    setSavingStatus(id);
+
+    try {
+      const res = await fetch(`/api/leads/${id}/convert`, {
+        method: "POST",
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result?.error || "Failed to convert lead to case");
+      }
+
+      setLeads((prev) =>
+        prev.map((lead) =>
+          lead.id === id ? { ...lead, status: "Converted to Case" } : lead
+        )
+      );
+
+      if (result?.redirectTo) {
+        window.location.href = result.redirectTo;
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to convert lead to case"
+      );
+    } finally {
+      setSavingStatus(null);
+    }
+  }
+
   return (
     <div className="grid grid-cols-12 gap-6">
       <div className="col-span-5 overflow-hidden rounded-xl border border-[#e5e5e5] bg-white">
@@ -269,45 +306,45 @@ export default function LeadsWorkspace({
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
-  <Link
-    href={`/leads/${selectedLead.id}`}
-    className="rounded-md border border-[#e4c9c4] bg-[#fdf6f5] px-4 py-2 text-sm font-medium text-[#4b0a06] hover:bg-[#f8eeee]"
-  >
-    View Lead
-  </Link>
+              <Link
+                href={`/leads/${selectedLead.id}`}
+                className="rounded-md border border-[#e4c9c4] bg-[#fdf6f5] px-4 py-2 text-sm font-medium text-[#4b0a06] hover:bg-[#f8eeee]"
+              >
+                View Lead
+              </Link>
 
-  <button
-    disabled={savingStatus === selectedLead.id}
-    onClick={() => updateLeadStatus(selectedLead.id, "Accepted")}
-    className="rounded-md bg-[#1f7a4d] px-4 py-2 text-sm font-medium text-white hover:bg-[#256f4a] disabled:opacity-50"
-  >
-    Accept Case
-  </button>
+              <button
+                disabled={savingStatus === selectedLead.id}
+                onClick={() => updateLeadStatus(selectedLead.id, "Accepted")}
+                className="rounded-md bg-[#1f7a4d] px-4 py-2 text-sm font-medium text-white hover:bg-[#256f4a] disabled:opacity-50"
+              >
+                Accept Case
+              </button>
 
-  <button
-    disabled={savingStatus === selectedLead.id}
-    onClick={() => updateLeadStatus(selectedLead.id, "Rejected")}
-    className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
-  >
-    Reject Case
-  </button>
+              <button
+                disabled={savingStatus === selectedLead.id}
+                onClick={() => updateLeadStatus(selectedLead.id, "Rejected")}
+                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
+              >
+                Reject Case
+              </button>
 
-  <button
-    disabled={savingStatus === selectedLead.id}
-    onClick={() => updateLeadStatus(selectedLead.id, "Converted to Case")}
-    className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
-  >
-    Convert to Case
-  </button>
+              <button
+                disabled={savingStatus === selectedLead.id}
+                onClick={() => convertLeadToCase(selectedLead.id)}
+                className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
+              >
+                Convert to Case
+              </button>
 
-  <button
-    disabled={savingStatus === selectedLead.id}
-    onClick={() => updateLeadStatus(selectedLead.id, "Archived")}
-    className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:bg-[#f7f7f7] disabled:opacity-50"
-  >
-    Archive
-  </button>
-</div>
+              <button
+                disabled={savingStatus === selectedLead.id}
+                onClick={() => updateLeadStatus(selectedLead.id, "Archived")}
+                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:bg-[#f7f7f7] disabled:opacity-50"
+              >
+                Archive
+              </button>
+            </div>
 
             <div className="mt-6 grid grid-cols-2 gap-4">
               <div className="rounded-lg border border-[#e5e5e5] bg-[#fcfcfc] p-4">
@@ -344,7 +381,9 @@ export default function LeadsWorkspace({
                 </h3>
                 <div className="mt-3 space-y-2 text-sm text-[#444444]">
                   <div>
-                    <span className="font-medium text-[#2b2b2b]">Date of Incident:</span>{" "}
+                    <span className="font-medium text-[#2b2b2b]">
+                      Date of Incident:
+                    </span>{" "}
                     {selectedLead.dateOfIncident}
                   </div>
                   <div>

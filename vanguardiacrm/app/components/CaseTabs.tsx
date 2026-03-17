@@ -12,14 +12,14 @@ const sections = [
   { label: "Settlement", slug: "settlement" },
 ];
 
-export default function CaseTabs({ caseId }: { caseId: string }) {
+export default function CaseTabs({ caseNumber }: { caseNumber: string }) {
   const pathname = usePathname();
 
   return (
     <div className="border-b border-[#e5e5e5] bg-white px-6">
       <nav className="flex flex-wrap gap-2 py-3">
         {sections.map((section) => {
-          const href = `/cases/${caseId}/${section.slug}`;
+          const href = `/cases/${caseNumber}/${section.slug}`;
           const active = pathname === href;
 
           return (
@@ -27,10 +27,10 @@ export default function CaseTabs({ caseId }: { caseId: string }) {
               key={section.slug}
               href={href}
               className={[
-                "rounded-md px-4 py-2 text-sm font-medium transition",
+                "rounded-md border px-4 py-2 text-sm font-medium transition",
                 active
-                  ? "bg-[#f3e7e5] text-[#4b0a06] border border-[#e4c9c4]"
-                  : "text-[#6b6b6b] hover:bg-[#f8eeee] hover:text-[#4b0a06] border border-transparent",
+                  ? "border-[#e4c9c4] bg-[#f3e7e5] text-[#4b0a06]"
+                  : "border-transparent text-[#6b6b6b] hover:bg-[#f8eeee] hover:text-[#4b0a06]",
               ].join(" ")}
             >
               {section.label}
