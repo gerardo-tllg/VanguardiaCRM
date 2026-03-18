@@ -148,11 +148,24 @@ export async function POST(req: Request) {
       .single();
 
     if (leadError || !lead) {
-      return NextResponse.json(
-        { error: leadError?.message || "Failed to create lead" },
-        { status: 500 }
-      );
-    }
+  console.error("ZAPIER LEAD INSERT ERROR:", {
+    message: leadError?.message,
+    details: leadError?.details,
+    hint: leadError?.hint,
+    code: leadError?.code,
+    leadInsert,
+  });
+
+  return NextResponse.json(
+    {
+      error: leadError?.message || "Failed to create lead",
+      details: leadError?.details ?? null,
+      hint: leadError?.hint ?? null,
+      code: leadError?.code ?? null,
+    },
+    { status: 500 }
+  );
+}
 
     if (body.ai_summary?.trim()) {
       await supabase.from("lead_notes").insert({
