@@ -126,20 +126,12 @@ export async function POST(req: Request) {
     };
 
     const leadInsert = {
-      client_name: clientName,
-      phone: phone || null,
-      email: email || null,
-      accident_date: body.accident_date || null,
-      accident_type: body.accident_type?.trim() || null,
-      injuries: body.injuries?.trim() || null,
-      ai_summary: body.ai_summary?.trim() || null,
-      lang: body.lang?.trim() || "en",
-      utm_source: body.utm_source?.trim() || null,
-      utm_campaign: body.utm_campaign?.trim() || null,
-      status: "New",
-      external_id: externalId || null,
-      raw_payload: normalizeRawPayload(body.raw_payload, fallbackRawPayload),
-    };
+  client_name: clientName,
+  phone: phone || null,
+  email: email || null,
+  status: "New",
+  raw_payload: normalizeRawPayload(body.raw_payload, fallbackRawPayload),
+};
 
     const { data: lead, error: leadError } = await supabase
       .from("leads")
