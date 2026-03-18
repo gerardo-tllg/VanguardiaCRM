@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
+
 import LeadsWorkspace from "../../components/LeadsWorkspace";
-import { supabaseAdmin } from "../../../lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import type { LeadRecord } from "../../../types/leads";
 
 function formatCentralTime(dateString: string) {
@@ -12,13 +13,24 @@ function formatCentralTime(dateString: string) {
 }
 
 export default async function LeadsPage() {
-  const { data, error } = await supabaseAdmin
+  const supabase = await createClient();
+
+    const { data, error } = await supabase
     .from("leads")
     .select("*")
     .order("created_at", { ascending: false });
+    
+
+  console.log("LEADS ERROR:", error);
+  console.log("LEADS COUNT:", data?.length);
 
   if (error) {
-    console.error("Failed to load leads:", error);
+    console.error("Failed to load leads:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
   }
 
   const leads: LeadRecord[] = data ?? [];
@@ -26,12 +38,16 @@ export default async function LeadsPage() {
   const normalizedLeads = leads.map((lead) => {
     const raw = (lead.raw_payload ?? {}) as Record<string, unknown>;
 
-    const statusMap: Record<string, "New Intake" | "Under Review" | "Accepted" | "Rejected" | "Converted to Case" | "Archived"> = {
+    const statusMap: Record<
+      string,
+      "New Intake" | "Under Review" | "Accepted" | "Rejected" | "Converted to Case" | "Archived"
+    > = {
       New: "New Intake",
       Reviewed: "Under Review",
       Accepted: "Accepted",
       Rejected: "Rejected",
       Archived: "Archived",
+      "Converted to Case": "Converted to Case",
     };
 
     const accidentType =

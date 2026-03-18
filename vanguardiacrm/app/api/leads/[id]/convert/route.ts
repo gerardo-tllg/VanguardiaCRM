@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
+
+console.log("USING NEW CONVERT ROUTE FILE");
 function toCaseNumber(n: number) {
   return `case${String(n).padStart(4, "0")}`;
 }
@@ -11,8 +13,9 @@ export async function POST(
 ) {
   try {
     const { id } = await context.params;
+    const supabase = await createClient();
 
-    const { data: lead, error: leadError } = await supabaseAdmin
+    const { data: lead, error: leadError } = await supabase
       .from("leads")
       .select("*")
       .eq("id", id)
@@ -22,7 +25,7 @@ export async function POST(
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    const { data: existingCase, error: existingCaseError } = await supabaseAdmin
+    const { data: existingCase, error: existingCaseError } = await supabase
       .from("cases")
       .select("id, case_number")
       .eq("lead_id", id)
@@ -46,7 +49,7 @@ export async function POST(
       );
     }
 
-    const { count, error: countError } = await supabaseAdmin
+    const { count, error: countError } = await supabase
       .from("cases")
       .select("*", { count: "exact", head: true });
 
@@ -59,7 +62,7 @@ export async function POST(
 
     const caseNumber = toCaseNumber((count ?? 0) + 1);
 
-    const { data: newCase, error: caseError } = await supabaseAdmin
+    const { data: newCase, error: caseError } = await supabase
       .from("cases")
       .insert({
         lead_id: lead.id,
@@ -83,10 +86,17 @@ export async function POST(
       );
     }
 
-    await supabaseAdmin
+    const { error: leadUpdateError } = await supabase
       .from("leads")
       .update({ status: "Converted to Case" })
       .eq("id", lead.id);
+
+    if (leadUpdateError) {
+      return NextResponse.json(
+        { error: leadUpdateError.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {

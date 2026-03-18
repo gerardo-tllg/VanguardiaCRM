@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type ZapierLeadPayload = {
   client_name?: string;
@@ -25,8 +25,8 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-
-    const { data: lead, error: leadError } = await supabaseAdmin
+    const supabase = await createClient();
+    const { data: lead, error: leadError } = await supabase
       .from("leads")
       .insert({
         client_name: payload.client_name,
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     }
 
     if (payload.ai_summary && lead?.id) {
-      const { error: noteError } = await supabaseAdmin.from("lead_notes").insert({
+      const { error: noteError } = await supabase.from("lead_notes").insert({
         lead_id: lead.id,
         author_email: "AI Intake System",
         body: payload.ai_summary,

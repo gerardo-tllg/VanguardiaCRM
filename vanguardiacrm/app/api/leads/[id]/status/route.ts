@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type UpdateLeadStatusBody = {
   status?: "New" | "Reviewed" | "Accepted" | "Rejected" | "Archived";
@@ -20,8 +20,8 @@ export async function PATCH(
     if (!body.status) {
       return NextResponse.json({ error: "status is required" }, { status: 400 });
     }
-
-    const { data, error } = await supabaseAdmin
+    const supabase = await createClient();
+    const { data, error } = await supabase
       .from("leads")
       .update({ status: body.status })
       .eq("id", id)

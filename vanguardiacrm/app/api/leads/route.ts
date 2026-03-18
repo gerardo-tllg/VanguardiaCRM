@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type CreateLeadBody = {
   client_name?: string;
@@ -24,8 +24,8 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-
-    const { data, error } = await supabaseAdmin
+    const supabase = await createClient();
+    const { data, error } = await supabase
       .from("leads")
       .insert({
         client_name: body.client_name,
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     }
 
     if (body.ai_summary && data?.id) {
-      await supabaseAdmin.from("lead_notes").insert({
+      await supabase.from("lead_notes").insert({
         lead_id: data.id,
         author_email: "Manual Intake",
         body: body.ai_summary,
