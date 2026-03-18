@@ -3,74 +3,178 @@ import { createClient } from "@/lib/supabase/server";
 
 type ZapierLeadPayload = {
   client_name?: string;
+  lead_name?: string;
   phone?: string;
+  lead_phone?: string;
   email?: string;
+  lead_email?: string;
   accident_date?: string;
   accident_type?: string;
   injuries?: string;
   ai_summary?: string;
+  ai_recommendation?: string;
   lang?: string;
   utm_source?: string;
+  utm_medium?: string;
   utm_campaign?: string;
-  [key: string]: unknown;
+  utm_term?: string;
+  utm_content?: string;
+  external_id?: string;
+  case_id?: string;
+  created_at?: string;
+  timestamp?: string;
+  source?: string;
+  action?: string;
+  raw_payload?: unknown;
 };
+
+function unauthorized() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+function badRequest(message: string) {
+  return NextResponse.json({ error: message }, { status: 400 });
+}
+
+function normalizeRawPayload(raw: unknown, fallback: Record<string, unknown>) {
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { raw_payload_text: raw, ...fallback };
+    }
+  }
+
+  if (raw && typeof raw === "object") {
+    return raw;
+  }
+
+  return fallback;
+}
 
 export async function POST(req: Request) {
   try {
-    const payload = (await req.json()) as ZapierLeadPayload;
+    const secret = req.headers.get("x-zapier-secret");
 
-    if (!payload.client_name) {
+    if (!process.env.ZAPIER_WEBHOOK_SECRET) {
       return NextResponse.json(
-        { error: "client_name is required" },
-        { status: 400 }
-      );
-    }
-    const supabase = await createClient();
-    const { data: lead, error: leadError } = await supabase
-      .from("leads")
-      .insert({
-        client_name: payload.client_name,
-        phone: payload.phone ?? null,
-        email: payload.email ?? null,
-        accident_date: payload.accident_date ?? null,
-        accident_type: payload.accident_type ?? null,
-        injuries: payload.injuries ?? null,
-        ai_summary: payload.ai_summary ?? null,
-        lang: payload.lang ?? null,
-        utm_source: payload.utm_source ?? null,
-        utm_campaign: payload.utm_campaign ?? null,
-        raw_payload: payload,
-        status: "New",
-      })
-      .select()
-      .single();
-
-    if (leadError) {
-      console.error("Supabase insert error:", leadError);
-      return NextResponse.json(
-        { error: "Failed to create lead" },
+        { error: "Missing ZAPIER_WEBHOOK_SECRET on server" },
         { status: 500 }
       );
     }
 
-    if (payload.ai_summary && lead?.id) {
-      const { error: noteError } = await supabase.from("lead_notes").insert({
-        lead_id: lead.id,
-        author_email: "AI Intake System",
-        body: payload.ai_summary,
-      });
+    if (secret !== process.env.ZAPIER_WEBHOOK_SECRET) {
+      return unauthorized();
+    }
 
-      if (noteError) {
-        console.error("Failed to create AI summary note:", noteError);
+    const body = (await req.json()) as ZapierLeadPayload;
+
+    const clientName = body.client_name?.trim() || body.lead_name?.trim() || "";
+    const phone = body.phone?.trim() || body.lead_phone?.trim() || "";
+    const email = body.email?.trim() || body.lead_email?.trim() || "";
+    const externalId = body.external_id?.trim() || body.case_id?.trim() || "";
+    const createdAt = body.created_at || body.timestamp || null;
+
+    if (!clientName) {
+      return badRequest("client_name is required");
+    }
+
+    if (!phone && !email) {
+      return badRequest("Either phone or email is required");
+    }
+
+    const supabase = await createClient();
+
+    if (externalId) {
+      const { data: existingLeadByExternalId } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("external_id", externalId)
+        .maybeSingle();
+
+      if (existingLeadByExternalId?.id) {
+        return NextResponse.json(
+          {
+            success: true,
+            leadId: existingLeadByExternalId.id,
+            duplicate: true,
+          },
+          { status: 200 }
+        );
       }
     }
 
-    return NextResponse.json({ success: true, lead }, { status: 200 });
-  } catch (error) {
-    console.error("Webhook error:", error);
+    const fallbackRawPayload = {
+      client_name: clientName,
+      phone,
+      email,
+      accident_date: body.accident_date ?? null,
+      accident_type: body.accident_type ?? null,
+      injuries: body.injuries ?? null,
+      ai_summary: body.ai_summary ?? null,
+      ai_recommendation: body.ai_recommendation ?? null,
+      lang: body.lang ?? null,
+      utm_source: body.utm_source ?? null,
+      utm_medium: body.utm_medium ?? null,
+      utm_campaign: body.utm_campaign ?? null,
+      utm_term: body.utm_term ?? null,
+      utm_content: body.utm_content ?? null,
+      external_id: externalId || null,
+      created_at: createdAt,
+      source: body.source ?? "zapier",
+      action: body.action ?? null,
+    };
+
+    const leadInsert = {
+      client_name: clientName,
+      phone: phone || null,
+      email: email || null,
+      accident_date: body.accident_date || null,
+      accident_type: body.accident_type?.trim() || null,
+      injuries: body.injuries?.trim() || null,
+      ai_summary: body.ai_summary?.trim() || null,
+      lang: body.lang?.trim() || "en",
+      utm_source: body.utm_source?.trim() || null,
+      utm_campaign: body.utm_campaign?.trim() || null,
+      status: "New",
+      external_id: externalId || null,
+      raw_payload: normalizeRawPayload(body.raw_payload, fallbackRawPayload),
+    };
+
+    const { data: lead, error: leadError } = await supabase
+      .from("leads")
+      .insert(leadInsert)
+      .select("id")
+      .single();
+
+    if (leadError || !lead) {
+      return NextResponse.json(
+        { error: leadError?.message || "Failed to create lead" },
+        { status: 500 }
+      );
+    }
+
+    if (body.ai_summary?.trim()) {
+      await supabase.from("lead_notes").insert({
+        lead_id: lead.id,
+        body: body.ai_summary.trim(),
+        author_name: "Gemini Intake AI",
+      });
+    }
+
     return NextResponse.json(
-      { error: "Invalid request payload" },
-      { status: 400 }
+      {
+        success: true,
+        leadId: lead.id,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Server error",
+      },
+      { status: 500 }
     );
   }
 }
