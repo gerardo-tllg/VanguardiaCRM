@@ -80,7 +80,7 @@ export default function CaseNotesPanel({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Add a note..."
-          className="min-h-[110px] w-full rounded-lg border border-[#d9d9d9] p-3 text-sm outline-none focus:border-[#2b2b2b]"
+          className="min-h-27.5 w-full rounded-lg border border-[#d9d9d9] p-3 text-sm outline-none focus:border-[#2b2b2b]"
         />
         <button
           type="button"

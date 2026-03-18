@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 
-export default async function CasePage({
-  params,
-}: {
+type PageProps = {
   params: Promise<{ caseId: string }>;
-}) {
+};
+
+export default async function CasePage({ params }: PageProps) {
   const { caseId } = await params;
   redirect(`/cases/${caseId}/overview`);
 }

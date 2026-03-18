@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export type LeadStatus =
   | "New Intake"
@@ -36,35 +36,37 @@ export type IntakeLead = {
   utmCampaign?: string;
 };
 
+type LeadTab = "active" | "converted" | "archived";
+
 function getPriorityStyles(priority: IntakeLead["priority"]) {
   switch (priority) {
     case "High":
-      return "bg-[#ecf8f1] text-[#1f7a4d] border border-[#b9e4cf]";
+      return "border border-[#b9e4cf] bg-[#ecf8f1] text-[#1f7a4d]";
     case "Medium":
-      return "bg-[#f3e7e5] text-[#4b0a06] border border-[#e4c9c4]";
+      return "border border-[#e4c9c4] bg-[#f3e7e5] text-[#4b0a06]";
     case "Low":
-      return "bg-[#f3f3f3] text-[#6b6b6b] border border-[#dddddd]";
+      return "border border-[#dddddd] bg-[#f3f3f3] text-[#6b6b6b]";
     default:
-      return "bg-[#f8f8f8] text-[#444444] border border-[#e5e5e5]";
+      return "border border-[#e5e5e5] bg-[#f8f8f8] text-[#444444]";
   }
 }
 
 function getStatusStyles(status: LeadStatus) {
   switch (status) {
     case "New Intake":
-      return "bg-[#f3e7e5] text-[#4b0a06] border border-[#e4c9c4]";
+      return "border border-[#e4c9c4] bg-[#f3e7e5] text-[#4b0a06]";
     case "Under Review":
-      return "bg-[#fff7e8] text-[#8a5a00] border border-[#f1d9a6]";
+      return "border border-[#f1d9a6] bg-[#fff7e8] text-[#8a5a00]";
     case "Accepted":
-      return "bg-[#ecf8f1] text-[#1f7a4d] border border-[#b9e4cf]";
+      return "border border-[#b9e4cf] bg-[#ecf8f1] text-[#1f7a4d]";
     case "Rejected":
-      return "bg-[#f3f3f3] text-[#6b6b6b] border border-[#dddddd]";
+      return "border border-[#dddddd] bg-[#f3f3f3] text-[#6b6b6b]";
     case "Converted to Case":
-      return "bg-[#e7f7ee] text-[#16643f] border border-[#a9d9c0]";
+      return "border border-[#a9d9c0] bg-[#e7f7ee] text-[#16643f]";
     case "Archived":
-      return "bg-[#f3f3f3] text-[#8a8a8a] border border-[#dddddd]";
+      return "border border-[#dddddd] bg-[#f3f3f3] text-[#8a8a8a]";
     default:
-      return "bg-[#f8f8f8] text-[#444444] border border-[#e5e5e5]";
+      return "border border-[#e5e5e5] bg-[#f8f8f8] text-[#444444]";
   }
 }
 
@@ -89,6 +91,19 @@ function uiStatusToDbStatus(
   }
 }
 
+function getTabLabel(tab: LeadTab) {
+  switch (tab) {
+    case "active":
+      return "Active Leads";
+    case "converted":
+      return "Converted";
+    case "archived":
+      return "Archived";
+    default:
+      return "Active Leads";
+  }
+}
+
 export default function LeadsWorkspace({
   initialLeads,
 }: {
@@ -98,25 +113,54 @@ export default function LeadsWorkspace({
   const [selectedId, setSelectedId] = useState<string>(initialLeads[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [savingStatus, setSavingStatus] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<LeadTab>("active");
 
-  const filteredLeads = useMemo(() => {
+  const visibleLeads = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return leads;
 
-    return leads.filter((lead) => {
-      return (
-        lead.clientName.toLowerCase().includes(q) ||
-        lead.caseType.toLowerCase().includes(q) ||
-        lead.source.toLowerCase().includes(q) ||
-        lead.location.toLowerCase().includes(q)
+    const searched = !q
+      ? leads
+      : leads.filter((lead) => {
+          return (
+            lead.clientName.toLowerCase().includes(q) ||
+            lead.caseType.toLowerCase().includes(q) ||
+            lead.source.toLowerCase().includes(q) ||
+            lead.location.toLowerCase().includes(q)
+          );
+        });
+
+    if (activeTab === "active") {
+      return searched.filter(
+        (lead) =>
+          lead.status !== "Converted to Case" && lead.status !== "Archived"
       );
-    });
-  }, [leads, search]);
+    }
+
+    if (activeTab === "converted") {
+      return searched.filter((lead) => lead.status === "Converted to Case");
+    }
+
+    return searched.filter((lead) => lead.status === "Archived");
+  }, [leads, search, activeTab]);
+
+  useEffect(() => {
+    if (!visibleLeads.some((lead) => lead.id === selectedId)) {
+      setSelectedId(visibleLeads[0]?.id ?? "");
+    }
+  }, [visibleLeads, selectedId]);
 
   const selectedLead =
-    filteredLeads.find((lead) => lead.id === selectedId) ??
-    filteredLeads[0] ??
-    null;
+    visibleLeads.find((lead) => lead.id === selectedId) ?? visibleLeads[0] ?? null;
+
+  const counts = useMemo(() => {
+    return {
+      active: leads.filter(
+        (lead) => lead.status !== "Converted to Case" && lead.status !== "Archived"
+      ).length,
+      converted: leads.filter((lead) => lead.status === "Converted to Case").length,
+      archived: leads.filter((lead) => lead.status === "Archived").length,
+    };
+  }, [leads]);
 
   async function updateLeadStatus(id: string, status: LeadStatus) {
     const previous = leads;
@@ -196,7 +240,9 @@ export default function LeadsWorkspace({
       <div className="col-span-5 overflow-hidden rounded-xl border border-[#e5e5e5] bg-white">
         <div className="border-b border-[#e5e5e5] p-4">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold text-[#2b2b2b]">Intake Queue</h2>
+            <h2 className="text-lg font-semibold text-[#2b2b2b]">
+              {getTabLabel(activeTab)}
+            </h2>
             <input
               type="text"
               placeholder="Search leads"
@@ -205,10 +251,48 @@ export default function LeadsWorkspace({
               className="w-55 rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
             />
           </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("active")}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                activeTab === "active"
+                  ? "border border-[#e4c9c4] bg-[#fdf6f5] text-[#4b0a06]"
+                  : "border border-[#e5e5e5] bg-white text-[#555555]"
+              }`}
+            >
+              Active ({counts.active})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("converted")}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                activeTab === "converted"
+                  ? "border border-[#a9d9c0] bg-[#e7f7ee] text-[#16643f]"
+                  : "border border-[#e5e5e5] bg-white text-[#555555]"
+              }`}
+            >
+              Converted ({counts.converted})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("archived")}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                activeTab === "archived"
+                  ? "border border-[#dddddd] bg-[#f3f3f3] text-[#6b6b6b]"
+                  : "border border-[#e5e5e5] bg-white text-[#555555]"
+              }`}
+            >
+              Archived ({counts.archived})
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[75vh] overflow-y-auto">
-          {filteredLeads.map((lead) => {
+          {visibleLeads.map((lead) => {
             const isSelected = selectedLead?.id === lead.id;
 
             return (
@@ -267,8 +351,10 @@ export default function LeadsWorkspace({
             );
           })}
 
-          {filteredLeads.length === 0 && (
-            <div className="p-6 text-sm text-[#6b6b6b]">No leads found.</div>
+          {visibleLeads.length === 0 && (
+            <div className="p-6 text-sm text-[#6b6b6b]">
+              No leads found in this section.
+            </div>
           )}
         </div>
       </div>
@@ -313,37 +399,62 @@ export default function LeadsWorkspace({
                 View Lead
               </Link>
 
-              <button
-                disabled={savingStatus === selectedLead.id}
-                onClick={() => updateLeadStatus(selectedLead.id, "Accepted")}
-                className="rounded-md bg-[#1f7a4d] px-4 py-2 text-sm font-medium text-white hover:bg-[#256f4a] disabled:opacity-50"
-              >
-                Accept Case
-              </button>
+              {activeTab === "active" && (
+                <>
+                  <button
+                    disabled={savingStatus === selectedLead.id}
+                    onClick={() =>
+                      updateLeadStatus(selectedLead.id, "Under Review")
+                    }
+                    className="rounded-md border border-[#f1d9a6] bg-[#fff7e8] px-4 py-2 text-sm font-medium text-[#8a5a00] hover:bg-[#fdf2d8] disabled:opacity-50"
+                  >
+                    Mark Under Review
+                  </button>
 
-              <button
-                disabled={savingStatus === selectedLead.id}
-                onClick={() => updateLeadStatus(selectedLead.id, "Rejected")}
-                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
-              >
-                Reject Case
-              </button>
+                  <button
+                    disabled={savingStatus === selectedLead.id}
+                    onClick={() => updateLeadStatus(selectedLead.id, "Rejected")}
+                    className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
 
-              <button
-                disabled={savingStatus === selectedLead.id}
-                onClick={() => convertLeadToCase(selectedLead.id)}
-                className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
-              >
-                Convert to Case
-              </button>
+                  <button
+                    disabled={savingStatus === selectedLead.id}
+                    onClick={() => convertLeadToCase(selectedLead.id)}
+                    className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
+                  >
+                    Convert to Case
+                  </button>
 
-              <button
-                disabled={savingStatus === selectedLead.id}
-                onClick={() => updateLeadStatus(selectedLead.id, "Archived")}
-                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:bg-[#f7f7f7] disabled:opacity-50"
-              >
-                Archive
-              </button>
+                  <button
+                    disabled={savingStatus === selectedLead.id}
+                    onClick={() => updateLeadStatus(selectedLead.id, "Archived")}
+                    className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:bg-[#f7f7f7] disabled:opacity-50"
+                  >
+                    Archive
+                  </button>
+                </>
+              )}
+
+              {activeTab === "converted" && (
+                <button
+                  disabled
+                  className="rounded-md border border-[#a9d9c0] bg-[#e7f7ee] px-4 py-2 text-sm font-medium text-[#16643f]"
+                >
+                  Converted to Case
+                </button>
+              )}
+
+              {activeTab === "archived" && (
+                <button
+                  disabled={savingStatus === selectedLead.id}
+                  onClick={() => updateLeadStatus(selectedLead.id, "Under Review")}
+                  className="rounded-md border border-[#f1d9a6] bg-[#fff7e8] px-4 py-2 text-sm font-medium text-[#8a5a00] hover:bg-[#fdf2d8] disabled:opacity-50"
+                >
+                  Restore to Under Review
+                </button>
+              )}
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-4">

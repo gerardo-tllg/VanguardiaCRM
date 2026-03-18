@@ -106,8 +106,8 @@ export default async function ProjectsPage() {
                     <Link
                       href={`/cases/${item.case_number}/overview`}
                       className="text-[#4b0a06] underline"
-                    >
-                      {item.client_name} - {item.case_number}
+                    >{/* where to change whats displayed next to case name */}
+                      {item.client_name} - {item.case_type}
                     </Link>
                   </td>
                   <td className="px-5 py-4 text-[#555555]">

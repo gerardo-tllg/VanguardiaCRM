@@ -1,71 +1,78 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-type CreateLeadBody = {
-  client_name?: string;
-  phone?: string;
-  email?: string;
-  accident_date?: string;
-  accident_type?: string;
-  injuries?: string;
-  ai_summary?: string;
-  lang?: string;
-  utm_source?: string;
-  utm_campaign?: string;
-};
-
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as CreateLeadBody;
+    const body = await req.json();
+    const supabase = await createClient();
 
-    if (!body.client_name) {
+    const payload = {
+      client_name: body.client_name?.trim() || null,
+      phone: body.phone?.trim() || null,
+      email: body.email?.trim() || null,
+      accident_date: body.accident_date || null,
+      accident_type: body.accident_type?.trim() || null,
+      injuries: body.injuries?.trim() || null,
+      ai_summary: body.ai_summary ?? null,
+      lang: body.lang || "en",
+      utm_source: body.utm_source || "manual",
+      utm_campaign: body.utm_campaign || "manual-entry",
+      status: "New",
+      raw_payload: body.raw_payload ?? {},
+    };
+
+    if (!payload.client_name) {
       return NextResponse.json(
-        { error: "client_name is required" },
+        { error: "Client name is required" },
         { status: 400 }
       );
     }
-    const supabase = await createClient();
+
+    if (!payload.phone) {
+      return NextResponse.json(
+        { error: "Phone is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!payload.accident_type) {
+      return NextResponse.json(
+        { error: "Accident type is required" },
+        { status: 400 }
+      );
+    }
+
     const { data, error } = await supabase
       .from("leads")
-      .insert({
-        client_name: body.client_name,
-        phone: body.phone ?? null,
-        email: body.email ?? null,
-        accident_date: body.accident_date ?? null,
-        accident_type: body.accident_type ?? null,
-        injuries: body.injuries ?? null,
-        ai_summary: body.ai_summary ?? null,
-        lang: body.lang ?? null,
-        utm_source: body.utm_source ?? "manual",
-        utm_campaign: body.utm_campaign ?? "manual-entry",
-        raw_payload: body,
-        status: "New",
-      })
-      .select()
+      .insert(payload)
+      .select("*")
       .single();
 
     if (error) {
-      console.error("Failed to create lead:", error);
+      console.error("Failed to create lead:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        payload,
+      });
+
       return NextResponse.json(
-        { error: "Failed to create lead" },
+        { error: error.message || "Failed to create lead" },
         { status: 500 }
       );
     }
 
-    if (body.ai_summary && data?.id) {
-      await supabase.from("lead_notes").insert({
-        lead_id: data.id,
-        author_email: "Manual Intake",
-        body: body.ai_summary,
-      });
-    }
-
-    return NextResponse.json({ success: true, lead: data }, { status: 200 });
+    return NextResponse.json({ success: true, lead: data }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/leads failed:", error);
+    console.error("Unexpected error creating lead:", error);
+
     return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 }
+      {
+        error:
+          error instanceof Error ? error.message : "Unexpected server error",
+      },
+      { status: 500 }
     );
   }
 }
