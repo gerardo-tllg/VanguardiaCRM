@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import CaseMedicalProvidersTab from "../../../../components/CaseMedicalProvidersTab";
+import CaseMedicalProvidersTab from "../../components/CaseMedicalProvidersTab";
 
 type PageProps = {
   params: Promise<{ caseId: string }>;
