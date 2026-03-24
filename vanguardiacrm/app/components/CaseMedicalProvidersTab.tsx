@@ -237,47 +237,56 @@ export default function CaseMedicalProvidersTab({
   }
 
   async function addProviderToCase() {
-    try {
-      setAdding(true);
-      setError(null);
+  try {
+    setAdding(true);
+    setError(null);
 
-      const payload =
-        addMode === "existing"
-          ? {
-              provider_id: selectedProviderId,
-            }
-          : {
-              ...newProviderForm,
-              treatment_status: "Active",
-              records_status: "Not Requested",
-              billing_status: "Not Requested",
-            };
+    const payload =
+      addMode === "existing"
+        ? {
+            provider_id: selectedProviderId,
+          }
+        : {
+            ...newProviderForm,
+            treatment_status: "Active",
+            records_status: "Not Requested",
+            billing_status: "Not Requested",
+          };
 
-      const res = await fetch(`/api/cases/${caseNumber}/providers`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+    const res = await fetch(`/api/cases/${caseNumber}/providers`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
-      const data: { error?: string } = await res.json();
+    const text = await res.text();
+    let data: { error?: string } | null = null;
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to add provider");
+    if (text) {
+      try {
+        data = JSON.parse(text) as { error?: string };
+      } catch {
+        throw new Error(`Server returned non-JSON response (${res.status})`);
       }
-
-      setShowAdd(false);
-      setSelectedProviderId("");
-      setProviderSearch("");
-      setNewProviderForm(EMPTY_NEW_PROVIDER);
-      router.refresh();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to add provider");
-    } finally {
-      setAdding(false);
     }
+
+    if (!res.ok) {
+      throw new Error(data?.error || `Failed to add provider (${res.status})`);
+    }
+
+    setShowAdd(false);
+    setSelectedProviderId("");
+    setProviderSearch("");
+    setNewProviderForm(EMPTY_NEW_PROVIDER);
+    router.refresh();
+  } catch (error) {
+    setError(error instanceof Error ? error.message : "Failed to add provider");
+  } finally {
+    setAdding(false);
   }
+}
 
   return (
     <div className="space-y-4">
