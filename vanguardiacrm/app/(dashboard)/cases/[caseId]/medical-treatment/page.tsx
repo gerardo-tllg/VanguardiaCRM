@@ -149,9 +149,7 @@ export default async function CaseMedicalTreatmentPage({
 
   return (
     <CaseMedicalProvidersTab
-      caseId={caseRecord.id}
       caseNumber={caseRecord.case_number}
-      caseName={caseRecord.client_name ?? caseRecord.case_number}
       initialCaseProviders={(caseProviders ?? []) as CaseProviderItem[]}
       providerDirectory={(providerDirectory ?? []) as ProviderDirectoryItem[]}
     />
