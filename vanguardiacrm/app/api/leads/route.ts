@@ -1,183 +1,77 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-const CASE_TYPE_CODES: Record<string, string> = {
-  auto_accident: "AA",
-  truck_accident: "TA",
-  premises_liability: "PL",
-  slip_fall: "SF",
-  motor_vehicle_accident: "MVA",
-  mva: "MVA",
-  unknown: "OT",
+type CreateLeadBody = {
+  client_name?: string;
+  phone?: string | null;
+  email?: string | null;
+  accident_date?: string | null;
+  accident_type?: string | null;
+  injuries?: string | null;
+  ai_summary?: string | null;
+  lang?: string | null;
+  utm_source?: string | null;
+  utm_campaign?: string | null;
+  raw_payload?: Record<string, unknown> | null;
 };
 
-function normalizeCaseType(value: string | null | undefined) {
-  if (!value) return "unknown";
-
-  return value
-    .toLowerCase()
-    .trim()
-    .replaceAll("&", "and")
-    .replaceAll("/", " ")
-    .replaceAll("-", "_")
-    .replaceAll(" ", "_");
-}
-
-function buildCasePrefix(accidentType: string | null | undefined) {
-  const normalizedType = normalizeCaseType(accidentType);
-  const typeCode = CASE_TYPE_CODES[normalizedType] || "OT";
-  const year = new Date().getFullYear();
-
-  return {
-    normalizedType,
-    typeCode,
-    prefix: `VL-${year}-${typeCode}-`,
-  };
-}
-
-function getNextSequence(existingCaseNumbers: string[], prefix: string) {
-  const usedNumbers = existingCaseNumbers
-    .filter((value) => value.startsWith(prefix))
-    .map((value) => {
-      const suffix = value.slice(prefix.length);
-      const parsed = Number.parseInt(suffix, 10);
-      return Number.isNaN(parsed) ? 0 : parsed;
-    });
-
-  const maxUsed = usedNumbers.length > 0 ? Math.max(...usedNumbers) : 0;
-  return String(maxUsed + 1).padStart(4, "0");
-}
-
-type RouteContext = {
-  params: Promise<{ id: string }>;
-};
-
-export async function POST(_req: Request, context: RouteContext) {
+export async function POST(req: Request) {
   try {
-    const { id } = await context.params;
+    const body = (await req.json()) as CreateLeadBody;
     const supabase = await createClient();
 
-    const { data: lead, error: leadError } = await supabase
-      .from("leads")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (leadError || !lead) {
-      return NextResponse.json({ error: "Lead not found" }, { status: 404 });
-    }
-
-    const { data: existingCase, error: existingCaseError } = await supabase
-      .from("cases")
-      .select("id, case_number")
-      .eq("lead_id", id)
-      .maybeSingle();
-
-    if (existingCaseError) {
+    if (!body.client_name?.trim()) {
       return NextResponse.json(
-        { error: existingCaseError.message },
-        { status: 500 }
+        { error: "client_name is required" },
+        { status: 400 }
       );
     }
-
-    if (existingCase) {
-      return NextResponse.json(
-        {
-          success: true,
-          case: existingCase,
-          redirectTo: `/cases/${existingCase.case_number}/overview`,
-        },
-        { status: 200 }
-      );
-    }
-
-    const { normalizedType, prefix } = buildCasePrefix(lead.accident_type);
-
-    const { data: existingCasesForType, error: existingCasesError } =
-      await supabase
-        .from("cases")
-        .select("case_number")
-        .ilike("case_number", `${prefix}%`);
-
-    if (existingCasesError) {
-      return NextResponse.json(
-        { error: existingCasesError.message },
-        { status: 500 }
-      );
-    }
-
-    const caseNumbers = (existingCasesForType ?? [])
-      .map((row) => row.case_number)
-      .filter((value): value is string => Boolean(value));
-
-    const nextSequence = getNextSequence(caseNumbers, prefix);
-    const caseNumber = `${prefix}${nextSequence}`;
-
-    const rawPayload =
-      lead.raw_payload && typeof lead.raw_payload === "object"
-        ? (lead.raw_payload as Record<string, unknown>)
-        : {};
 
     const insertPayload = {
-      lead_id: lead.id,
-      case_number: caseNumber,
-      client_name: lead.client_name,
-      case_type: normalizedType,
-      phone: lead.phone ?? null,
-      email: lead.email ?? null,
-      status: "Open",
-      phase: "Welcome",
-      assigned_to: null,
-      raw_payload: {
-        ...rawPayload,
-        accident_date: lead.accident_date,
-        accident_type: lead.accident_type,
-        injuries: lead.injuries,
-        ai_summary: lead.ai_summary,
-        lang: lead.lang,
-        utm_source: lead.utm_source,
-        utm_campaign: lead.utm_campaign,
-        source_lead_id: lead.id,
-      },
+      client_name: body.client_name.trim(),
+      phone: body.phone ?? null,
+      email: body.email ?? null,
+      accident_date: body.accident_date ?? null,
+      accident_type: body.accident_type ?? null,
+      injuries: body.injuries ?? null,
+      ai_summary: body.ai_summary ?? null,
+      lang: body.lang ?? null,
+      utm_source: body.utm_source ?? "manual",
+      utm_campaign: body.utm_campaign ?? "manual-entry",
+      raw_payload: body.raw_payload ?? body,
+      status: "New",
     };
 
-    const { data: newCase, error: caseError } = await supabase
-      .from("cases")
+    const { data: lead, error } = await supabase
+      .from("leads")
       .insert(insertPayload)
       .select()
       .single();
 
-    if (caseError || !newCase) {
+    if (error || !lead) {
       return NextResponse.json(
-        { error: caseError?.message || "Failed to create case" },
+        { error: error?.message || "Failed to create lead" },
         { status: 500 }
       );
     }
 
-    const { error: leadUpdateError } = await supabase
-      .from("leads")
-      .update({ status: "Converted to Case" })
-      .eq("id", lead.id);
+    if (body.ai_summary?.trim()) {
+      const { error: noteError } = await supabase.from("lead_notes").insert({
+        lead_id: lead.id,
+        author_email: "AI Intake",
+        body: body.ai_summary.trim(),
+      });
 
-    if (leadUpdateError) {
-      return NextResponse.json(
-        { error: leadUpdateError.message },
-        { status: 500 }
-      );
+      if (noteError) {
+        console.error("Failed to create initial AI note:", noteError);
+      }
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        case: newCase,
-        redirectTo: `/cases/${newCase.case_number}/overview`,
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({ success: true, lead }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Server error" },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "Invalid request" },
+      { status: 400 }
     );
   }
 }
