@@ -54,25 +54,25 @@ export default async function CaseLayout({
   }
 
   const raw =
-  caseRecord.raw_payload && typeof caseRecord.raw_payload === "object"
-    ? (caseRecord.raw_payload as Record<string, unknown>)
-    : {};
+    caseRecord.raw_payload && typeof caseRecord.raw_payload === "object"
+      ? (caseRecord.raw_payload as Record<string, unknown>)
+      : {};
 
-const caseData = {
-  id: caseRecord.case_number,
-  clientName: caseRecord.client_name ?? "Unknown Client",
-  dateOfIncident:
-    typeof raw.accident_date === "string" && raw.accident_date
-      ? raw.accident_date
-      : "Not provided",
-  caseType: caseRecord.case_type ?? "Personal Injury",
-  status: caseRecord.status ?? "Open",
-  phone: caseRecord.phone ?? "N/A",
-  email: caseRecord.email ?? "N/A",
-  assignedTo: caseRecord.assigned_to ?? "Unassigned",
-  office:
-    typeof raw.office === "string" && raw.office ? raw.office : "TX",
-};
+  const caseData = {
+    id: caseRecord.case_number,
+    clientName: caseRecord.client_name ?? "Unknown Client",
+    dateOfIncident:
+      typeof raw.accident_date === "string" && raw.accident_date
+        ? raw.accident_date
+        : "Not provided",
+    caseType: caseRecord.case_type ?? "Personal Injury",
+    status: caseRecord.status ?? "Open",
+    phone: caseRecord.phone ?? "N/A",
+    email: caseRecord.email ?? "N/A",
+    assignedTo: caseRecord.assigned_to ?? "Unassigned",
+    office:
+      typeof raw.office === "string" && raw.office ? raw.office : "TX",
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f5f5]">

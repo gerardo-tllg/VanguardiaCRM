@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 type ZapierLeadPayload = {
+  source?: string;
   client_name?: string;
+  full_name?: string;
   lead_name?: string;
   phone?: string;
   lead_phone?: string;
@@ -23,8 +25,13 @@ type ZapierLeadPayload = {
   case_id?: string;
   created_at?: string;
   timestamp?: string;
-  source?: string;
   action?: string;
+  campaign_name?: string;
+  adset_name?: string;
+  ad_name?: string;
+  form_id?: string;
+  market?: string;
+  medium?: string;
   raw_payload?: unknown;
 };
 
@@ -69,7 +76,12 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as ZapierLeadPayload;
 
-    const clientName = body.client_name?.trim() || body.lead_name?.trim() || "";
+    const source = body.source?.trim() || "unknown";
+    const clientName =
+      body.client_name?.trim() ||
+      body.full_name?.trim() ||
+      body.lead_name?.trim() ||
+      "";
     const phone = body.phone?.trim() || body.lead_phone?.trim() || "";
     const email = body.email?.trim() || body.lead_email?.trim() || "";
     const externalId = body.external_id?.trim() || body.case_id?.trim() || "";
@@ -86,25 +98,22 @@ export async function POST(req: Request) {
     const supabase = await createClient();
 
     if (externalId) {
-      const { data: existingLeadByExternalId } = await supabase
+      const { data: existingLead } = await supabase
         .from("leads")
         .select("id")
         .eq("external_id", externalId)
         .maybeSingle();
 
-      if (existingLeadByExternalId?.id) {
+      if (existingLead?.id) {
         return NextResponse.json(
-          {
-            success: true,
-            leadId: existingLeadByExternalId.id,
-            duplicate: true,
-          },
+          { success: true, leadId: existingLead.id, duplicate: true },
           { status: 200 }
         );
       }
     }
 
     const fallbackRawPayload = {
+      source,
       client_name: clientName,
       phone,
       email,
@@ -121,17 +130,37 @@ export async function POST(req: Request) {
       utm_content: body.utm_content ?? null,
       external_id: externalId || null,
       created_at: createdAt,
-      source: body.source ?? "zapier",
       action: body.action ?? null,
+      campaign_name: body.campaign_name ?? null,
+      adset_name: body.adset_name ?? null,
+      ad_name: body.ad_name ?? null,
+      form_id: body.form_id ?? null,
+      market: body.market ?? null,
+      medium: body.medium ?? body.utm_medium ?? null,
     };
 
     const leadInsert = {
-  client_name: clientName,
-  phone: phone || null,
-  email: email || null,
-  status: "New",
-  raw_payload: normalizeRawPayload(body.raw_payload, fallbackRawPayload),
-};
+      client_name: clientName,
+      phone: phone || null,
+      email: email || null,
+      accident_date: body.accident_date || null,
+      accident_type: body.accident_type?.trim() || null,
+      injuries: body.injuries?.trim() || null,
+      ai_summary: body.ai_summary?.trim() || null,
+      lang: body.lang?.trim() || "en",
+      utm_source: body.utm_source?.trim() || source,
+      utm_campaign: body.utm_campaign?.trim() || null,
+      status: "New",
+      source,
+      external_id: externalId || null,
+      campaign_name: body.campaign_name?.trim() || null,
+      adset_name: body.adset_name?.trim() || null,
+      ad_name: body.ad_name?.trim() || null,
+      form_id: body.form_id?.trim() || null,
+      market: body.market?.trim() || null,
+      medium: body.medium?.trim() || body.utm_medium?.trim() || null,
+      raw_payload: normalizeRawPayload(body.raw_payload, fallbackRawPayload),
+    };
 
     const { data: lead, error: leadError } = await supabase
       .from("leads")
@@ -140,38 +169,35 @@ export async function POST(req: Request) {
       .single();
 
     if (leadError || !lead) {
-  console.error("ZAPIER LEAD INSERT ERROR:", {
-    message: leadError?.message,
-    details: leadError?.details,
-    hint: leadError?.hint,
-    code: leadError?.code,
-    leadInsert,
-  });
+      console.error("LEAD INSERT ERROR:", {
+        message: leadError?.message,
+        details: leadError?.details,
+        hint: leadError?.hint,
+        code: leadError?.code,
+        leadInsert,
+      });
 
-  return NextResponse.json(
-    {
-      error: leadError?.message || "Failed to create lead",
-      details: leadError?.details ?? null,
-      hint: leadError?.hint ?? null,
-      code: leadError?.code ?? null,
-    },
-    { status: 500 }
-  );
-}
+      return NextResponse.json(
+        {
+          error: leadError?.message || "Failed to create lead",
+          details: leadError?.details ?? null,
+          hint: leadError?.hint ?? null,
+          code: leadError?.code ?? null,
+        },
+        { status: 500 }
+      );
+    }
 
     if (body.ai_summary?.trim()) {
       await supabase.from("lead_notes").insert({
         lead_id: lead.id,
         body: body.ai_summary.trim(),
-        author_name: "Gemini Intake AI",
+        author_name: source === "facebook_lead_ad" ? "Facebook Lead Ad" : "AI Intake",
       });
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        leadId: lead.id,
-      },
+      { success: true, leadId: lead.id },
       { status: 200 }
     );
   } catch (error) {
