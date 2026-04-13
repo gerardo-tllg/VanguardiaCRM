@@ -12,14 +12,53 @@ function formatCentralTime(dateString: string) {
   });
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function getNestedRawPayload(rawPayload: unknown) {
+  const top = asRecord(rawPayload);
+  const nested = asRecord(top.raw_payload);
+
+  return { top, nested };
+}
+
+function getString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function parseInjuries(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 export default async function LeadsPage() {
   const supabase = await createClient();
 
-    const { data, error } = await supabase
+  const { data, error } = await supabase
     .from("leads")
     .select("*")
     .order("created_at", { ascending: false });
-    
 
   console.log("LEADS ERROR:", error);
   console.log("LEADS COUNT:", data?.length);
@@ -36,7 +75,7 @@ export default async function LeadsPage() {
   const leads: LeadRecord[] = data ?? [];
 
   const normalizedLeads = leads.map((lead) => {
-    const raw = (lead.raw_payload ?? {}) as Record<string, unknown>;
+    const { top, nested } = getNestedRawPayload(lead.raw_payload);
 
     const statusMap: Record<
       string,
@@ -52,41 +91,76 @@ export default async function LeadsPage() {
 
     const accidentType =
       lead.accident_type ??
-      (typeof raw.accident_type === "string" ? raw.accident_type : "Unknown");
+      getString(top.accident_type, nested.accident_type) ??
+      "Unknown";
 
     const location =
-      typeof raw.location === "string"
-        ? raw.location
-        : typeof raw.accident_location === "string"
-        ? raw.accident_location
-        : "Not provided";
+      getString(
+        nested.location,
+        nested.accident_location,
+        top.location,
+        top.accident_location
+      ) ?? "Not provided";
 
     const defendant =
-      typeof raw.defendant === "string"
-        ? raw.defendant
-        : typeof raw.at_fault_party === "string"
-        ? raw.at_fault_party
-        : "Unknown";
+      getString(
+        nested.defendant,
+        nested.at_fault_party,
+        top.defendant,
+        top.at_fault_party
+      ) ?? "Unknown";
 
     const treatment =
-      typeof raw.treatment === "string"
-        ? raw.treatment
-        : typeof raw.medical_treatment === "string"
-        ? raw.medical_treatment
-        : "Not provided";
+      getString(
+        nested.treatment,
+        nested.medical_treatment,
+        top.treatment,
+        top.medical_treatment
+      ) ?? "Not provided";
+
+    const incidentDescription =
+      getString(
+        nested.incident_description,
+        nested.accident_description,
+        nested.intake_notes,
+        top.incident_description,
+        top.accident_description,
+        top.intake_notes
+      ) ?? "";
 
     const source =
-      typeof raw.utm_source === "string"
-        ? raw.utm_source
-        : lead.utm_source ?? "AI Intake";
+      getString(
+        lead.utm_source,
+        top.utm_source,
+        nested.utm_source,
+        nested.source_type,
+        top.source_type
+      ) ?? "AI Intake";
 
-    const injuriesArray =
-      typeof lead.injuries === "string"
-        ? lead.injuries
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean)
-        : [];
+    const priorityRaw =
+      getString(
+        nested.priority,
+        top.priority
+      ) ?? "Medium";
+
+    const priority: "Low" | "Medium" | "High" =
+      priorityRaw === "Low" || priorityRaw === "Medium" || priorityRaw === "High"
+        ? priorityRaw
+        : "Medium";
+
+    const injuriesArray = parseInjuries(
+      lead.injuries ?? nested.injuries ?? top.injuries
+    );
+
+    const evidenceFiles = Array.isArray(nested.evidence_files)
+      ? nested.evidence_files.filter(
+          (file): file is string => typeof file === "string" && file.trim().length > 0
+        )
+      : Array.isArray(top.evidence_files)
+      ? top.evidence_files.filter(
+          (file): file is string => typeof file === "string" && file.trim().length > 0
+        )
+      : [];
 
     return {
       id: lead.id,
@@ -94,23 +168,31 @@ export default async function LeadsPage() {
       phone: lead.phone ?? "N/A",
       email: lead.email ?? "",
       source,
-      priority: "Medium" as const,
-      score: 70,
+      priority,
+      score: priority === "High" ? 85 : priority === "Low" ? 45 : 70,
       caseType: accidentType,
-      dateOfIncident: lead.accident_date ?? "Not provided",
+      dateOfIncident:
+        lead.accident_date ??
+        getString(top.accident_date, nested.accident_date) ??
+        "Not provided",
       location,
       defendant,
       injuries: injuriesArray.length > 0 ? injuriesArray : ["Not provided"],
       treatment,
-      aiSummary: lead.ai_summary ?? "No AI summary available.",
+      aiSummary: lead.ai_summary ?? getString(top.ai_summary, nested.ai_summary) ?? "No AI summary available.",
       aiRecommendation: "Accept" as const,
-      strategyMemo: lead.ai_summary ?? "No strategy memo available.",
-      evidenceFiles: [],
+      strategyMemo:
+        incidentDescription ||
+        lead.ai_summary ||
+        getString(top.ai_summary, nested.ai_summary) ||
+        "No strategy memo available.",
+      incidentDescription,
+      evidenceFiles,
       status: statusMap[lead.status] ?? "New Intake",
       submittedAt: formatCentralTime(lead.created_at),
-      lang: lead.lang ?? "",
-      utmSource: lead.utm_source ?? "",
-      utmCampaign: lead.utm_campaign ?? "",
+      lang: lead.lang ?? getString(top.lang, nested.lang) ?? "",
+      utmSource: lead.utm_source ?? getString(top.utm_source, nested.utm_source) ?? "",
+      utmCampaign: lead.utm_campaign ?? getString(top.utm_campaign, nested.utm_campaign) ?? "",
     };
   });
 

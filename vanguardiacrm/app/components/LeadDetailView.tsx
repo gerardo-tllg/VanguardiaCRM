@@ -63,40 +63,86 @@ function InfoRow({
   );
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function getString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function parseInjuries(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
-  const raw = (lead.raw_payload ?? {}) as Record<string, unknown>;
+  const top = asRecord(lead.raw_payload);
+  const nested = asRecord(top.raw_payload);
 
   const location =
-    typeof raw.location === "string"
-      ? raw.location
-      : typeof raw.accident_location === "string"
-      ? raw.accident_location
-      : "Not provided";
+    getString(
+      nested.location,
+      nested.accident_location,
+      top.location,
+      top.accident_location
+    ) ?? "Not provided";
 
   const defendant =
-    typeof raw.defendant === "string"
-      ? raw.defendant
-      : typeof raw.at_fault_party === "string"
-      ? raw.at_fault_party
-      : "Unknown";
+    getString(
+      nested.defendant,
+      nested.at_fault_party,
+      top.defendant,
+      top.at_fault_party
+    ) ?? "Unknown";
 
   const treatment =
-    typeof raw.treatment === "string"
-      ? raw.treatment
-      : typeof raw.medical_treatment === "string"
-      ? raw.medical_treatment
-      : "Not provided";
+    getString(
+      nested.treatment,
+      nested.medical_treatment,
+      top.treatment,
+      top.medical_treatment
+    ) ?? "Not provided";
 
-  const evidenceFiles = Array.isArray(raw.evidence_files)
-    ? raw.evidence_files.filter((file): file is string => typeof file === "string")
+  const incidentDescription =
+    getString(
+      nested.incident_description,
+      nested.accident_description,
+      nested.intake_notes,
+      top.incident_description,
+      top.accident_description,
+      top.intake_notes
+    ) ?? "";
+
+  const evidenceFiles = Array.isArray(nested.evidence_files)
+    ? nested.evidence_files.filter((file): file is string => typeof file === "string")
+    : Array.isArray(top.evidence_files)
+    ? top.evidence_files.filter((file): file is string => typeof file === "string")
     : [];
 
-  const injuries = lead.injuries
-    ? lead.injuries
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : [];
+  const injuries = parseInjuries(
+    lead.injuries ?? nested.injuries ?? top.injuries
+  );
 
   return (
     <div className="mx-auto w-full max-w-375">
@@ -175,6 +221,15 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
               <InfoRow label="Defendant" value={defendant} />
               <InfoRow label="Treatment" value={treatment} />
             </div>
+          </div>
+
+          <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
+            <h2 className="text-lg font-semibold text-[#2b2b2b]">
+              Incident Description
+            </h2>
+            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[#444444]">
+              {incidentDescription || "No incident description available."}
+            </p>
           </div>
 
           <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">

@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import type { LeadNoteRecord } from "@/types/lead-notes";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+
+type LeadNoteRecord = {
+  id: string;
+  created_at: string;
+  lead_id: string;
+  author_email: string | null;
+  body: string;
+};
 
 function formatCentralTime(dateString: string) {
   return new Date(dateString).toLocaleString("en-US", {
@@ -16,13 +24,14 @@ export default function LeadNotesSection({
   initialNotes,
 }: {
   leadId: string;
-  initialNotes: LeadNoteRecord[];
+  initialNotes?: LeadNoteRecord[];
 }) {
-  const [notes, setNotes] = useState<LeadNoteRecord[]>(initialNotes);
+  const router = useRouter();
+  const [notes, setNotes] = useState<LeadNoteRecord[]>(initialNotes ?? []);
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function handleAddNote(e: React.FormEvent) {
+  async function handleAddNote(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     const trimmed = body.trim();
@@ -50,6 +59,7 @@ export default function LeadNotesSection({
 
       setNotes((prev) => [result.note, ...prev]);
       setBody("");
+      router.refresh();
     } catch (error) {
       console.error(error);
       alert(error instanceof Error ? error.message : "Failed to add note");
@@ -89,10 +99,11 @@ export default function LeadNotesSection({
               key={note.id}
               className="rounded-lg border border-[#eeeeee] bg-[#fafafa] p-4"
             >
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold text-[#2b2b2b]">
                   {note.author_email || "Unknown"}
                 </div>
+
                 <div className="text-xs text-[#6b6b6b]">
                   {formatCentralTime(note.created_at)}
                 </div>
@@ -104,7 +115,9 @@ export default function LeadNotesSection({
             </div>
           ))
         ) : (
-          <div className="text-sm text-[#6b6b6b]">No notes yet.</div>
+          <div className="text-sm text-[#6b6b6b]">
+            No notes yet for this lead.
+          </div>
         )}
       </div>
     </div>
