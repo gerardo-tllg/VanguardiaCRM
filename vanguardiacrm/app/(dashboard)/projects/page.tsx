@@ -30,10 +30,10 @@ export default async function ProjectsPage() {
   const supabase = await createClient();
 
   const { data: cases, error } = await supabase
-    .from("cases")
-.select("*")
-.neq("status", "screening")
-.order("created_at", { ascending: false })
+  .from("cases")
+  .select("*")
+  .not("lead_id", "is", null)
+  .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Failed to load cases:", {
