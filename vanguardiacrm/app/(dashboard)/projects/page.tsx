@@ -31,8 +31,9 @@ export default async function ProjectsPage() {
 
   const { data: cases, error } = await supabase
     .from("cases")
-    .select("*")
-    .order("created_at", { ascending: false });
+.select("*")
+.neq("status", "screening")
+.order("created_at", { ascending: false })
 
   if (error) {
     console.error("Failed to load cases:", {

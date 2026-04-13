@@ -34,6 +34,7 @@ export type IntakeLead = {
   lang?: string;
   utmSource?: string;
   utmCampaign?: string;
+  incidentDescription?: string
 };
 
 type LeadTab = "active" | "converted" | "archived";
