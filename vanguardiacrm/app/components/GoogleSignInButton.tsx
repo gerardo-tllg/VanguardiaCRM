@@ -1,6 +1,6 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/clients";
+import { createClient } from "@/lib/supabase/admin";
 
 export default function GoogleSignInButton() {
   async function handleSignIn() {
