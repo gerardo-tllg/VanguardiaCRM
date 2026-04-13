@@ -96,9 +96,29 @@ function parseInjuries(value: unknown): string[] {
   return [];
 }
 
+function parseJsonRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== "string" || !value.trim()) return {};
+  try {
+    return asRecord(JSON.parse(value));
+  } catch {
+    return {};
+  }
+}
+
 export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
   const top = asRecord(lead.raw_payload);
   const nested = asRecord(top.raw_payload);
+  const aiScreeningNotes = parseJsonRecord(top.ai_screening_notes);
+
+  const dateOfIncident =
+    lead.accident_date ??
+    getString(top.accident_date, nested.accident_date) ??
+    "Not provided";
+
+  const accidentType =
+    lead.accident_type ??
+    getString(top.accident_type, nested.accident_type) ??
+    "Unknown Case Type";
 
   const location =
     getString(
@@ -131,18 +151,33 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
       nested.intake_notes,
       top.incident_description,
       top.accident_description,
-      top.intake_notes
+      top.intake_notes,
+      lead.ai_summary
     ) ?? "";
 
   const evidenceFiles = Array.isArray(nested.evidence_files)
-    ? nested.evidence_files.filter((file): file is string => typeof file === "string")
+    ? nested.evidence_files.filter(
+        (file): file is string => typeof file === "string" && file.trim().length > 0
+      )
     : Array.isArray(top.evidence_files)
-    ? top.evidence_files.filter((file): file is string => typeof file === "string")
+    ? top.evidence_files.filter(
+        (file): file is string => typeof file === "string" && file.trim().length > 0
+      )
     : [];
 
   const injuries = parseInjuries(
     lead.injuries ?? nested.injuries ?? top.injuries
   );
+
+  const aiSummary =
+    lead.ai_summary ??
+    getString(top.ai_summary, nested.ai_summary, aiScreeningNotes.reasoning) ??
+    "No AI summary available.";
+
+  const language =
+    lead.lang ??
+    getString(top.client_language, top.lang, nested.client_language, nested.lang) ??
+    "N/A";
 
   return (
     <div className="mx-auto w-full max-w-375">
@@ -160,8 +195,7 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
           </h1>
 
           <p className="mt-2 text-sm text-[#6b6b6b]">
-            {lead.accident_type || "Unknown Case Type"} · Received{" "}
-            {formatCentralTime(lead.created_at)}
+            {accidentType} · Received {formatCentralTime(lead.created_at)}
           </p>
         </div>
 
@@ -194,7 +228,7 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
               <InfoRow label="Name" value={lead.client_name} />
               <InfoRow label="Phone" value={lead.phone || "N/A"} />
               <InfoRow label="Email" value={lead.email || "N/A"} />
-              <InfoRow label="Language" value={lead.lang || "N/A"} />
+              <InfoRow label="Language" value={language} />
               <InfoRow
                 label="Received"
                 value={formatCentralTime(lead.created_at)}
@@ -209,14 +243,8 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
             </h2>
 
             <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              <InfoRow
-                label="Date of Incident"
-                value={lead.accident_date || "Not provided"}
-              />
-              <InfoRow
-                label="Accident Type"
-                value={lead.accident_type || "Not provided"}
-              />
+              <InfoRow label="Date of Incident" value={dateOfIncident} />
+              <InfoRow label="Accident Type" value={accidentType} />
               <InfoRow label="Location" value={location} />
               <InfoRow label="Defendant" value={defendant} />
               <InfoRow label="Treatment" value={treatment} />
@@ -254,12 +282,14 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
           <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
             <h2 className="text-lg font-semibold text-[#2b2b2b]">AI Summary</h2>
             <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[#444444]">
-              {lead.ai_summary || "No AI summary available."}
+              {aiSummary}
             </p>
           </div>
 
           <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-            <h2 className="text-lg font-semibold text-[#2b2b2b]">Evidence Files</h2>
+            <h2 className="text-lg font-semibold text-[#2b2b2b]">
+              Evidence Files
+            </h2>
 
             <div className="mt-4 flex flex-wrap gap-2">
               {evidenceFiles.length > 0 ? (
@@ -280,7 +310,9 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
 
         <div className="space-y-6 xl:col-span-4">
           <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-            <h2 className="text-lg font-semibold text-[#2b2b2b]">Attribution</h2>
+            <h2 className="text-lg font-semibold text-[#2b2b2b]">
+              Attribution
+            </h2>
 
             <div className="mt-4 space-y-4">
               <InfoRow label="UTM Source" value={lead.utm_source || "N/A"} />
