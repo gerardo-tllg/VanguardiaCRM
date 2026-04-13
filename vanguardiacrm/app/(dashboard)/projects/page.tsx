@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 type CaseRecord = {
   id: string;
@@ -11,6 +11,8 @@ type CaseRecord = {
   phone: string | null;
   email: string | null;
   phase: string | null;
+  status: string | null;
+  lead_id: string | null;
   created_at: string;
 };
 
@@ -27,12 +29,10 @@ function getPhaseStyles(phase: string | null) {
 }
 
 export default async function ProjectsPage() {
-  const supabase = await createClient();
-
-  const { data: cases, error } = await supabase
-  .from("cases")
-  .select("*")
-  .order("created_at", { ascending: false });
+  const { data: cases, error } = await supabaseAdmin
+    .from("cases")
+    .select("*")
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Failed to load cases:", {
@@ -83,12 +83,14 @@ export default async function ProjectsPage() {
           Status is not Complete
         </div>
       </div>
-    <div className="mb-4 rounded-md border border-[#e5e5e5] bg-[#fafafa] p-4 text-sm text-[#2b2b2b]">
-  <div>Projects error: {error ? error.message : "none"}</div>
-  <div>Projects row count: {cases?.length ?? 0}</div>
-  <div>Supabase URL: {process.env.NEXT_PUBLIC_SUPABASE_URL}</div>
-  <div>Service role present: {process.env.SUPABASE_SERVICE_ROLE_KEY ? "yes" : "no"}</div>
-</div>
+
+      <div className="mb-4 rounded-md border border-[#e5e5e5] bg-[#fafafa] p-4 text-sm text-[#2b2b2b]">
+        <div>Projects error: {error ? error.message : "none"}</div>
+        <div>Projects row count: {cases?.length ?? 0}</div>
+        <div>Supabase URL: {process.env.NEXT_PUBLIC_SUPABASE_URL}</div>
+        <div>Service role present: {process.env.SUPABASE_SERVICE_ROLE_KEY ? "yes" : "no"}</div>
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-[#e5e5e5] bg-white">
         <table className="min-w-full text-sm">
           <thead className="border-b border-[#e5e5e5] bg-[#fafafa] text-left text-[#2b2b2b]">
@@ -111,8 +113,8 @@ export default async function ProjectsPage() {
                     <Link
                       href={`/cases/${item.case_number}/overview`}
                       className="text-[#4b0a06] underline"
-                    >{/* where to change whats displayed next to case name */}
-                      {item.client_name} - {item.case_type}
+                    >
+                      {item.client_name} - {item.case_number}
                     </Link>
                   </td>
                   <td className="px-5 py-4 text-[#555555]">
