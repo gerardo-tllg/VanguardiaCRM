@@ -149,3 +149,4 @@ console.log("PROJECTS ERROR:", error);
       </div>
     </>
   );
+}
