@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 
 type UpdateLeadStatusBody = {
   status?: "New" | "Reviewed" | "Accepted" | "Rejected" | "Archived";

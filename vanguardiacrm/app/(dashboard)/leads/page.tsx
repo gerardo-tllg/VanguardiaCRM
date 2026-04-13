@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import LeadsWorkspace from "../../components/LeadsWorkspace";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 import type { LeadRecord } from "../../../types/leads";
 
 function formatCentralTime(dateString: string) {

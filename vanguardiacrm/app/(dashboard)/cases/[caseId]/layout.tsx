@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import CaseHeader from "../../../components/CaseHeader";
 import CaseTabs from "../../../components/CaseTabs";
 import CaseNotesPanel from "../../../components/CaseNotesPanel";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 
 type LayoutProps = {
   children: React.ReactNode;

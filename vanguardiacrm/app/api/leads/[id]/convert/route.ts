@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 
 const CASE_TYPE_CODES: Record<string, string> = {
   auto_accident: "AA",

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 import LeadDetailView from "../../../components/LeadDetailView";
 import type { LeadRecord } from "@/types/leads";
 import type { LeadNoteRecord } from "@/types/lead-notes";

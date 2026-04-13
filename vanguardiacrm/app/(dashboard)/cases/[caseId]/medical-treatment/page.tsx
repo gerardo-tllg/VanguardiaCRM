@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 import CaseMedicalProvidersTab from "../../../../components/CaseMedicalProvidersTab";
 
 type PageProps = {
