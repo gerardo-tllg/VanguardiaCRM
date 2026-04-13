@@ -32,7 +32,6 @@ export default async function ProjectsPage() {
   const { data: cases, error } = await supabase
   .from("cases")
   .select("*")
-  .or("lead_id.not.is.null,status.neq.screening")
   .order("created_at", { ascending: false });
 
   if (error) {
