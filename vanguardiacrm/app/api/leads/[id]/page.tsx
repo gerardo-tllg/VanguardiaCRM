@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import LeadDetailView from "../../../components/LeadDetailView";
 import type { LeadRecord } from "@/types/leads";
 import type { LeadNoteRecord } from "@/types/lead-notes";
@@ -10,11 +10,12 @@ type PageProps = {
 
 export default async function LeadDetailPage({ params }: PageProps) {
   const { id } = await params;
+  const supabase = await createClient();
 
   const [{ data: lead, error: leadError }, { data: notes, error: notesError }] =
     await Promise.all([
-      supabaseAdmin.from("leads").select("*").eq("id", id).single(),
-      supabaseAdmin
+      supabase.from("leads").select("*").eq("id", id).single(),
+      supabase
         .from("lead_notes")
         .select("*")
         .eq("lead_id", id)

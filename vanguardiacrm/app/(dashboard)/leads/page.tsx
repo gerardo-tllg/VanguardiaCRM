@@ -161,7 +161,7 @@ export default async function LeadsPage() {
       });
     } else {
       sourceCaseMap = new Map(
-        ((sourceCases ?? []) as SourceCaseRecord[]).map((row) => [row.id, row])
+        ((sourceCases ?? []) as unknown as SourceCaseRecord[]).map((row) => [row.id, row])
       );
     }
   }
