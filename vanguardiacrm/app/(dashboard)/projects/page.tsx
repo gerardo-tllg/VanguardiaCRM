@@ -31,9 +31,10 @@ function getPhaseStyles(phase: string | null) {
 export default async function ProjectsPage() {
   const { data: cases, error } = await supabaseAdmin
   .from("cases")
-  .select("*")
-  .not("status", "in", '("Archived","archived")')
+  .select("*") // Add this to start the query
+  .not("status", "in", '("Archived","archived","screening","Screening")')
   .order("created_at", { ascending: false });
+
 
   if (error) {
     console.error("Failed to load cases:", {
