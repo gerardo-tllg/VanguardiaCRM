@@ -88,16 +88,6 @@ export default async function ProjectsPage() {
           Status is not Complete
         </div>
       </div>
-
-      <div className="mb-4 rounded-md border border-[#e5e5e5] bg-[#fafafa] p-4 text-sm text-[#2b2b2b]">
-        <div>Projects error: {error ? error.message : "none"}</div>
-        <div>Projects row count: {rows.length}</div>
-        <div>Supabase URL: {process.env.NEXT_PUBLIC_SUPABASE_URL}</div>
-        <div>
-          Service role present: {process.env.SUPABASE_SERVICE_ROLE_KEY ? "yes" : "no"}
-        </div>
-      </div>
-
       <div className="overflow-hidden rounded-xl border border-[#e5e5e5] bg-white">
         <table className="min-w-full text-sm">
           <thead className="border-b border-[#e5e5e5] bg-[#fafafa] text-left text-[#2b2b2b]">
