@@ -236,19 +236,73 @@ export default async function LeadsPage() {
         top.accident_description,
         top.intake_notes,
         sourceCase?.accident_description,
-        lead.ai_summary
       ) ?? "";
 
     const aiSummary =
-      lead.ai_summary ??
       getString(
+        lead.ai_summary,
         top.ai_summary,
         nested.ai_summary,
         aiScreeningNotes.reasoning,
-        sourceCase?.accident_description
       ) ??
       "No AI summary available.";
-
+      const recommendation =
+      getString(aiScreeningNotes.recommendation)?.toLowerCase() === "reject"
+        ? "Reject"
+        : "Accept";
+        const confidence =
+        getNumber(
+          top.ai_case_type_confidence,
+          nested.ai_case_type_confidence,
+          aiScreeningNotes.case_type_confidence
+        );
+        const screeningScore =
+        getNumber(
+          top.screening_score,
+          nested.screening_score,
+          sourceCase?.screening_score,
+          aiScreeningNotes.viability_score
+        );
+        const estimatedCaseValue =
+        getNumber(
+          top.estimated_case_value,
+          nested.estimated_case_value,
+          sourceCase?.estimated_case_value
+        );
+        const liabilityAssessment =
+        getString(
+          top.liability_assessment,
+          nested.liability_assessment,
+          sourceCase?.liability_assessment,
+          aiScreeningNotes.liability_assessment
+        );
+        const injurySeverity =
+        getString(
+          top.injury_severity,
+          nested.injury_severity,
+          sourceCase?.injury_severity,
+          aiScreeningNotes.injury_severity
+        );
+        const redFlags = Array.isArray(aiScreeningNotes.red_flags)
+        ? aiScreeningNotes.red_flags.filter(
+            (flag): flag is string =>
+              typeof flag === "string" && flag.trim().length > 0
+          )
+        : [];
+          const strategyParts = [
+  screeningScore ? `Screening score: ${screeningScore}/100` : null,
+  estimatedCaseValue ? `Estimated case value: ${estimatedCaseValue}` : null,
+  liabilityAssessment ? `Liability: ${liabilityAssessment}` : null,
+  injurySeverity ? `Injury severity: ${injurySeverity}` : null,
+  confidence ? `Case type confidence: ${confidence}` : null,
+  redFlags.length > 0 ? `Red flags: ${redFlags.join(", ")}` : null,
+  aiScreeningNotes.reasoning && aiScreeningNotes.reasoning !== aiSummary
+    ? `Reasoning: ${aiScreeningNotes.reasoning}`
+    : null,
+]
+  .filter(Boolean)
+  .join("\n");
+    const strategyMemo = `${recommendation === "Accept" ? "Accept" : "Reject"} - ${strategyParts}`;
     const source =
       getString(
         lead.utm_source,
@@ -298,8 +352,10 @@ export default async function LeadsPage() {
       email: lead.email || sourceCase?.email || "",
       source,
       priority,
-      score,
+      score: screeningScore ?? 70,
       caseType: accidentType,
+      strategyMemo,
+      incidentDescription,
       dateOfIncident,
       location,
       defendant,
@@ -310,11 +366,6 @@ export default async function LeadsPage() {
         getString(aiScreeningNotes.recommendation)?.toLowerCase() === "reject"
           ? ("Reject" as const)
           : ("Accept" as const),
-      strategyMemo:
-        incidentDescription ||
-        aiSummary ||
-        "No strategy memo available.",
-      incidentDescription,
       evidenceFiles,
       status: statusMap[lead.status] ?? "New Intake",
       submittedAt: formatCentralTime(lead.created_at),
