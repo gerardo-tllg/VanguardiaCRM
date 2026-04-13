@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import CaseHeader from "../../../components/CaseHeader";
 import CaseTabs from "../../../components/CaseTabs";
 import CaseNotesPanel from "../../../components/CaseNotesPanel";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -16,9 +16,8 @@ export default async function CaseLayout({
   params,
 }: LayoutProps) {
   const { caseId } = await params;
-  const supabase = await createClient();
 
-  const { data: caseRecord, error: caseError } = await supabase
+  const { data: caseRecord, error: caseError } = await supabaseAdmin
     .from("cases")
     .select("*")
     .eq("case_number", caseId)
@@ -35,7 +34,7 @@ export default async function CaseLayout({
     notFound();
   }
 
-  const { data: notes, error: notesError } = await supabase
+  const { data: notes, error: notesError } = await supabaseAdmin
     .from("case_notes")
     .select("*")
     .eq("case_id", caseRecord.id)
