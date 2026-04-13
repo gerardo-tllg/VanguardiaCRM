@@ -30,9 +30,13 @@ export default async function ProjectsPage() {
   const supabase = await createClient();
 
   const { data: cases, error } = await supabase
-    .from("cases")
-    .select("*")
-    .order("created_at", { ascending: false });
+  .from("cases")
+  .select("*")
+  .not("lead_id", "is", null)
+  .or("lead_id.not.is.null,status.neq.screening")
+  .order("created_at", { ascending: false });
+  console.log("PROJECTS CASES:", cases);
+console.log("PROJECTS ERROR:", error);
 
   if (error) {
     console.error("Failed to load cases:", {
@@ -84,6 +88,10 @@ export default async function ProjectsPage() {
         </div>
       </div>
 
+    <div className="mb-4 rounded-md border border-[#e5e5e5] bg-[#fafafa] p-4 text-sm text-[#2b2b2b]">
+  <div>Projects error: {error ? error.message : "none"}</div>
+  <div>Projects row count: {cases?.length ?? 0}</div>
+</div>
       <div className="overflow-hidden rounded-xl border border-[#e5e5e5] bg-white">
         <table className="min-w-full text-sm">
           <thead className="border-b border-[#e5e5e5] bg-[#fafafa] text-left text-[#2b2b2b]">
@@ -141,4 +149,3 @@ export default async function ProjectsPage() {
       </div>
     </>
   );
-}
