@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import CaseIncidentTab from "@/app/components/CaseIncidentTab";
 
 type PageProps = {
@@ -8,9 +8,8 @@ type PageProps = {
 
 export default async function CaseIncidentPage({ params }: PageProps) {
   const { caseId } = await params;
-  const supabase = await createClient();
 
-  const { data: caseRecord, error } = await supabase
+  const { data: caseRecord, error } = await supabaseAdmin
     .from("cases")
     .select("*")
     .eq("case_number", caseId)
