@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/client";
 
 type Note = {
   id: string;
