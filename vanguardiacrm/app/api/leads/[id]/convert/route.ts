@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const CASE_TYPE_CODES: Record<string, string> = {
   auto_accident: "AA",
@@ -55,9 +55,8 @@ type RouteContext = {
 export async function POST(_req: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const supabase = await createClient();
 
-    const { data: lead, error: leadError } = await supabase
+    const { data: lead, error: leadError } = await supabaseAdmin
       .from("leads")
       .select("*")
       .eq("id", id)
@@ -67,7 +66,7 @@ export async function POST(_req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    const { data: existingCase, error: existingCaseError } = await supabase
+    const { data: existingCase, error: existingCaseError } = await supabaseAdmin
       .from("cases")
       .select("id, case_number")
       .eq("lead_id", id)
@@ -94,7 +93,7 @@ export async function POST(_req: Request, context: RouteContext) {
     const { normalizedType, prefix } = buildCasePrefix(lead.accident_type);
 
     const { data: existingCasesForType, error: existingCasesError } =
-      await supabase
+      await supabaseAdmin
         .from("cases")
         .select("case_number")
         .ilike("case_number", `${prefix}%`);
@@ -141,7 +140,7 @@ export async function POST(_req: Request, context: RouteContext) {
       },
     };
 
-    const { data: newCase, error: caseError } = await supabase
+    const { data: newCase, error: caseError } = await supabaseAdmin
       .from("cases")
       .insert(insertPayload)
       .select()
@@ -154,7 +153,7 @@ export async function POST(_req: Request, context: RouteContext) {
       );
     }
 
-    const { error: leadUpdateError } = await supabase
+    const { error: leadUpdateError } = await supabaseAdmin
       .from("leads")
       .update({ status: "Converted to Case" })
       .eq("id", lead.id);

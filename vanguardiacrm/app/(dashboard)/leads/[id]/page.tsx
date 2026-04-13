@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import LeadDetailView from "../../../components/LeadDetailView";
 import type { LeadRecord } from "../../../../types/leads";
 
@@ -11,9 +11,8 @@ type PageProps = {
 
 export default async function LeadDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("leads")
     .select("*")
     .eq("id", id)

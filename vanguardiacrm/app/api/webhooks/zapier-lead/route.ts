@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type ZapierLeadPayload = {
   source?: string;
@@ -95,10 +95,9 @@ export async function POST(req: Request) {
       return badRequest("Either phone or email is required");
     }
 
-    const supabase = await createClient();
 
     if (externalId) {
-      const { data: existingLead } = await supabase
+      const { data: existingLead } = await supabaseAdmin
         .from("leads")
         .select("id")
         .eq("external_id", externalId)
@@ -162,7 +161,7 @@ export async function POST(req: Request) {
       raw_payload: normalizeRawPayload(body.raw_payload, fallbackRawPayload),
     };
 
-    const { data: lead, error: leadError } = await supabase
+    const { data: lead, error: leadError } = await supabaseAdmin
       .from("leads")
       .insert(leadInsert)
       .select("id")
@@ -189,7 +188,7 @@ export async function POST(req: Request) {
     }
 
     if (body.ai_summary?.trim()) {
-      await supabase.from("lead_notes").insert({
+      await supabaseAdmin.from("lead_notes").insert({
         lead_id: lead.id,
         body: body.ai_summary.trim(),
         author_name: source === "facebook_lead_ad" ? "Facebook Lead Ad" : "AI Intake",

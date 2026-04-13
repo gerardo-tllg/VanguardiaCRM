@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type RouteContext = {
   params: Promise<{ caseId: string }>;
@@ -15,11 +15,10 @@ export async function POST(req: Request, context: RouteContext) {
   try {
     const { caseId } = await context.params;
     const body = await req.json();
-    const supabase = await createClient();
 
     console.log("ADD PROVIDER REQUEST:", { caseId, body });
 
-    const { data: caseRecord, error: caseError } = await supabase
+    const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
       .select("id, case_number")
       .eq("case_number", caseId)
@@ -62,7 +61,7 @@ export async function POST(req: Request, context: RouteContext) {
         );
       }
 
-      const { data: newProvider, error: providerError } = await supabase
+      const { data: newProvider, error: providerError } = await supabaseAdmin
         .from("providers")
         .insert(providerPayload)
         .select("id")
@@ -79,7 +78,7 @@ export async function POST(req: Request, context: RouteContext) {
       providerId = newProvider.id;
     }
 
-    const { data: existingLink, error: existingLinkError } = await supabase
+    const { data: existingLink, error: existingLinkError } = await supabaseAdmin
       .from("case_providers")
       .select("id")
       .eq("case_id", caseRecord.id)
@@ -101,7 +100,7 @@ export async function POST(req: Request, context: RouteContext) {
       );
     }
 
-    const { data: caseProvider, error: caseProviderError } = await supabase
+    const { data: caseProvider, error: caseProviderError } = await supabaseAdmin
       .from("case_providers")
       .insert({
         case_id: caseRecord.id,
@@ -125,7 +124,7 @@ export async function POST(req: Request, context: RouteContext) {
       );
     }
 
-    const { error: financialError } = await supabase
+    const { error: financialError } = await supabaseAdmin
       .from("case_provider_financials")
       .insert({
         case_provider_id: caseProvider.id,

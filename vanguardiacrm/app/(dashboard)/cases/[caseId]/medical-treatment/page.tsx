@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import CaseMedicalProvidersTab from "../../../../components/CaseMedicalProvidersTab";
 
 type PageProps = {
@@ -66,9 +66,8 @@ export default async function CaseMedicalTreatmentPage({
   params,
 }: PageProps) {
   const { caseId } = await params;
-  const supabase = await createClient();
 
-  const { data: caseRecord, error: caseError } = await supabase
+  const { data: caseRecord, error: caseError } = await supabaseAdmin
     .from("cases")
     .select("id, case_number, client_name")
     .eq("case_number", caseId)
@@ -78,7 +77,7 @@ export default async function CaseMedicalTreatmentPage({
     notFound();
   }
 
-  const { data: caseProviders, error: providersError } = await supabase
+  const { data: caseProviders, error: providersError } = await supabaseAdmin
     .from("case_providers")
     .select(`
       id,
@@ -138,7 +137,7 @@ export default async function CaseMedicalTreatmentPage({
     console.error("Failed to load case providers:", providersError);
   }
 
-  const { data: providerDirectory, error: directoryError } = await supabase
+  const { data: providerDirectory, error: directoryError } = await supabaseAdmin
     .from("providers")
     .select("*")
     .order("name", { ascending: true });

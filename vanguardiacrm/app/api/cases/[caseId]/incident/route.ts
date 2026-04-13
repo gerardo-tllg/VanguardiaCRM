@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type RouteContext = {
   params: Promise<{ caseId: string }>;
@@ -9,9 +9,9 @@ export async function PATCH(req: Request, context: RouteContext) {
   try {
     const { caseId } = await context.params;
     const body = await req.json();
-    const supabase = await createClient();
+  
 
-    const { data: existingCase, error: fetchError } = await supabase
+    const { data: existingCase, error: fetchError } = await supabaseAdmin
       .from("cases")
       .select("*")
       .eq("case_number", caseId)
@@ -64,7 +64,7 @@ export async function PATCH(req: Request, context: RouteContext) {
       raw_payload: nextRaw,
     };
 
-    const { data: updatedRows, error: updateError } = await supabase
+    const { data: updatedRows, error: updateError } = await supabaseAdmin
       .from("cases")
       .update(updatePayload)
       .eq("case_number", caseId)
@@ -87,7 +87,7 @@ export async function PATCH(req: Request, context: RouteContext) {
       );
     }
 
-    const { data: updatedCase, error: refetchError } = await supabase
+    const { data: updatedCase, error: refetchError } = await supabaseAdmin
       .from("cases")
       .select("*")
       .eq("case_number", caseId)

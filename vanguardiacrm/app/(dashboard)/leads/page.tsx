@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import LeadsWorkspace from "../../components/LeadsWorkspace";
-import { createClient } from "@/lib/supabase/client";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { LeadRecord } from "../../../types/leads";
 
 function formatCentralTime(dateString: string) {
@@ -53,9 +53,8 @@ function parseInjuries(value: unknown): string[] {
 }
 
 export default async function LeadsPage() {
-  const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("leads")
     .select("*")
     .order("created_at", { ascending: false });
