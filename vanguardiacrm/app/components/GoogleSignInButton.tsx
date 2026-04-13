@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/admin";
 
 export default function GoogleSignInButton() {
   async function handleSignIn() {
-    const supabase = createClient();
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
