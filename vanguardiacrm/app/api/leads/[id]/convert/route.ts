@@ -48,6 +48,55 @@ function getNextSequence(existingCaseNumbers: string[], prefix: string) {
   return String(maxUsed + 1).padStart(4, "0");
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function getString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function getNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+function getJson(...values: unknown[]): Record<string, unknown> | null {
+  for (const value of values) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    if (typeof value === "string" && value.trim()) {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
@@ -112,10 +161,77 @@ export async function POST(_req: Request, context: RouteContext) {
     const nextSequence = getNextSequence(caseNumbers, prefix);
     const caseNumber = `${prefix}${nextSequence}`;
 
-    const rawPayload =
-      lead.raw_payload && typeof lead.raw_payload === "object"
-        ? (lead.raw_payload as Record<string, unknown>)
-        : {};
+    const rawPayload = asRecord(lead.raw_payload);
+    const nestedRaw = asRecord(rawPayload.raw_payload);
+    const aiScreeningNotes = getJson(
+      lead.ai_screening_notes,
+      rawPayload.ai_screening_notes,
+      nestedRaw.ai_screening_notes
+    );
+
+    const accidentLocation = getString(
+      lead.accident_location,
+      rawPayload.accident_location,
+      nestedRaw.accident_location,
+      rawPayload.location,
+      nestedRaw.location
+    );
+
+    const accidentDescription = getString(
+      lead.accident_description,
+      rawPayload.accident_description,
+      nestedRaw.accident_description,
+      rawPayload.incident_description,
+      nestedRaw.incident_description,
+      rawPayload.intake_notes,
+      nestedRaw.intake_notes,
+      lead.ai_summary
+    );
+
+    const clientLanguage = getString(
+      lead.client_language,
+      lead.lang,
+      rawPayload.client_language,
+      nestedRaw.client_language,
+      rawPayload.lang,
+      nestedRaw.lang
+    );
+
+    const policeReportNumber = getString(
+      lead.police_report_number,
+      rawPayload.police_report_number,
+      nestedRaw.police_report_number
+    );
+
+    const screeningScore = getNumber(
+      lead.screening_score,
+      rawPayload.screening_score,
+      nestedRaw.screening_score
+    );
+
+    const estimatedCaseValue = getNumber(
+      lead.estimated_case_value,
+      rawPayload.estimated_case_value,
+      nestedRaw.estimated_case_value
+    );
+
+    const liabilityAssessment = getString(
+      lead.liability_assessment,
+      rawPayload.liability_assessment,
+      nestedRaw.liability_assessment
+    );
+
+    const injurySeverity = getString(
+      lead.injury_severity,
+      rawPayload.injury_severity,
+      nestedRaw.injury_severity
+    );
+
+    const aiCaseTypeConfidence = getNumber(
+      lead.ai_case_type_confidence,
+      rawPayload.ai_case_type_confidence,
+      nestedRaw.ai_case_type_confidence
+    );
 
     const insertPayload = {
       lead_id: lead.id,
@@ -127,13 +243,55 @@ export async function POST(_req: Request, context: RouteContext) {
       status: "Open",
       phase: "Welcome",
       assigned_to: null,
+
+      accident_date: lead.accident_date ?? null,
+      accident_location: accidentLocation,
+      accident_description: accidentDescription,
+      client_language: clientLanguage,
+      police_report_number: policeReportNumber,
+
+      screening_score: screeningScore,
+      estimated_case_value: estimatedCaseValue,
+      liability_assessment: liabilityAssessment,
+      injury_severity: injurySeverity,
+      ai_screening_notes: aiScreeningNotes,
+      ai_case_type_confidence: aiCaseTypeConfidence,
+
+      at_fault_insurer: lead.at_fault_insurer ?? null,
+      at_fault_policy_number: lead.at_fault_policy_number ?? null,
+      at_fault_adjuster_name: lead.at_fault_adjuster_name ?? null,
+      at_fault_adjuster_phone: lead.at_fault_adjuster_phone ?? null,
+      at_fault_adjuster_email: lead.at_fault_adjuster_email ?? null,
+      at_fault_claim_number: lead.at_fault_claim_number ?? null,
+      at_fault_policy_limits: lead.at_fault_policy_limits ?? null,
+
+      client_insurer: lead.client_insurer ?? null,
+      client_policy_number: lead.client_policy_number ?? null,
+      client_claim_number: lead.client_claim_number ?? null,
+      um_uim_limits: lead.um_uim_limits ?? null,
+      pip_med_pay_limits: lead.pip_med_pay_limits ?? null,
+
+      source_campaign: lead.source_campaign ?? null,
+      source_medium: lead.source_medium ?? null,
+      source_channel: lead.source_channel ?? null,
+
       raw_payload: {
         ...rawPayload,
         accident_date: lead.accident_date,
         accident_type: lead.accident_type,
+        accident_location: accidentLocation,
+        accident_description: accidentDescription,
         injuries: lead.injuries,
         ai_summary: lead.ai_summary,
         lang: lead.lang,
+        client_language: clientLanguage,
+        police_report_number: policeReportNumber,
+        screening_score: screeningScore,
+        estimated_case_value: estimatedCaseValue,
+        liability_assessment: liabilityAssessment,
+        injury_severity: injurySeverity,
+        ai_screening_notes: aiScreeningNotes,
+        ai_case_type_confidence: aiCaseTypeConfidence,
         utm_source: lead.utm_source,
         utm_campaign: lead.utm_campaign,
         source_lead_id: lead.id,
@@ -155,7 +313,7 @@ export async function POST(_req: Request, context: RouteContext) {
 
     const { error: leadUpdateError } = await supabaseAdmin
       .from("leads")
-      .update({ status: "Converted to Case" })
+      .update({ status: "Converted to Case", updated_at: new Date().toISOString() })
       .eq("id", lead.id);
 
     if (leadUpdateError) {
