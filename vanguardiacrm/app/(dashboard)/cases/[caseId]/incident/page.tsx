@@ -20,54 +20,82 @@ export default async function CaseIncidentPage({ params }: PageProps) {
   }
 
   const raw =
-    caseRecord.raw_payload && typeof caseRecord.raw_payload === "object"
-      ? (caseRecord.raw_payload as Record<string, unknown>)
-      : {};
+  caseRecord.raw_payload && typeof caseRecord.raw_payload === "object"
+    ? (caseRecord.raw_payload as Record<string, unknown>)
+    : {};
 
-  const incident =
-    raw.incident && typeof raw.incident === "object"
-      ? (raw.incident as Record<string, unknown>)
-      : {};
+const incident =
+  raw.incident && typeof raw.incident === "object"
+    ? (raw.incident as Record<string, unknown>)
+    : {};
 
-  return (
-    <CaseIncidentTab
-      caseNumber={caseRecord.case_number}
-      initialData={{
-        accident_date:
-          typeof raw.accident_date === "string" ? raw.accident_date : "",
-        incident_time:
-          typeof incident.incident_time === "string" ? incident.incident_time : "",
-        incident_type:
-          typeof incident.incident_type === "string"
-            ? incident.incident_type
-            : caseRecord.case_type ?? "",
-        location:
-          typeof incident.location === "string" ? incident.location : "",
-        city: typeof incident.city === "string" ? incident.city : "",
-        state: typeof incident.state === "string" ? incident.state : "",
-        client_role:
-          typeof incident.client_role === "string" ? incident.client_role : "",
-        defendant:
-          typeof incident.defendant === "string" ? incident.defendant : "",
-        police_report_number:
-          typeof incident.police_report_number === "string"
-            ? incident.police_report_number
-            : "",
-        investigating_agency:
-          typeof incident.investigating_agency === "string"
-            ? incident.investigating_agency
-            : "",
-        witness_info:
-          typeof incident.witness_info === "string" ? incident.witness_info : "",
-        conditions:
-          typeof incident.conditions === "string" ? incident.conditions : "",
-        narrative:
-          typeof incident.narrative === "string" ? incident.narrative : "",
-        liability_notes:
-          typeof incident.liability_notes === "string"
-            ? incident.liability_notes
-            : "",
-      }}
-    />
-  );
+function getString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+const incidentData = {
+  accidentDate:
+    caseRecord.accident_date
+      ? String(caseRecord.accident_date)
+      : getString(raw.accident_date, incident.accident_date),
+
+  incidentType:
+    caseRecord.case_type ??
+    getString(raw.accident_type, incident.incident_type) ??
+    "",
+
+  location:
+    getString(
+      caseRecord.accident_location,
+      raw.accident_location,
+      raw.location,
+      incident.location
+    ) || "—",
+
+  clientRole:
+    getString(incident.client_role) || "—",
+
+  defendant:
+    getString(
+      raw.defendant,
+      raw.at_fault_party,
+      incident.defendant
+    ) || "—",
+
+  policeReportNumber:
+    getString(
+      caseRecord.police_report_number,
+      raw.police_report_number,
+      incident.police_report_number
+    ) || "—",
+
+  investigatingAgency:
+    getString(incident.investigating_agency) || "—",
+
+  witnessInfo:
+    getString(incident.witness_info) || "—",
+
+  conditions:
+    getString(incident.conditions) || "—",
+
+  narrative:
+    getString(
+      caseRecord.accident_description,
+      raw.accident_description,
+      raw.incident_description,
+      raw.intake_notes,
+      incident.narrative
+    ) || "—",
+
+  liabilityNotes:
+    getString(
+      caseRecord.liability_assessment,
+      raw.liability_assessment,
+      incident.liability_notes
+    ) || "—",
+};
+  
 }
