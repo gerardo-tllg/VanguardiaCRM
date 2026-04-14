@@ -13,8 +13,8 @@ type SourceCaseRecord = {
   accident_date: string | null;
   accident_location: string | null;
   accident_description: string | null;
-  screening_score: string | null;
-  estimated_case_value: string | null;
+  screening_score: number | string | null;
+  estimated_case_value: number | string | null;
   liability_assessment: string | null;
   injury_severity: string | null;
   ai_screening_notes: string | null;
@@ -161,7 +161,10 @@ export default async function LeadsPage() {
       });
     } else {
       sourceCaseMap = new Map(
-        ((sourceCases ?? []) as unknown as SourceCaseRecord[]).map((row) => [row.id, row])
+        ((sourceCases ?? []) as unknown as SourceCaseRecord[]).map((row) => [
+          row.id,
+          row,
+        ])
       );
     }
   }
@@ -174,9 +177,12 @@ export default async function LeadsPage() {
       ? sourceCaseMap.get(migratedFromCaseId)
       : undefined;
 
-    const aiScreeningNotes = sourceCase?.ai_screening_notes
+    const aiScreeningNotes = lead.ai_screening_notes
+      ? parseJsonRecord(lead.ai_screening_notes)
+      : sourceCase?.ai_screening_notes
       ? parseJsonRecord(sourceCase.ai_screening_notes)
-      : {};
+      : parseJsonRecord(top.ai_screening_notes) ||
+        parseJsonRecord(nested.ai_screening_notes);
 
     const statusMap: Record<
       string,
@@ -235,7 +241,7 @@ export default async function LeadsPage() {
         top.incident_description,
         top.accident_description,
         top.intake_notes,
-        sourceCase?.accident_description,
+        sourceCase?.accident_description
       ) ?? "";
 
     const aiSummary =
@@ -243,66 +249,86 @@ export default async function LeadsPage() {
         lead.ai_summary,
         top.ai_summary,
         nested.ai_summary,
-        aiScreeningNotes.reasoning,
-      ) ??
-      "No AI summary available.";
-      const recommendation =
+        aiScreeningNotes.reasoning
+      ) ?? "No AI summary available.";
+
+    const recommendation =
       getString(aiScreeningNotes.recommendation)?.toLowerCase() === "reject"
         ? "Reject"
         : "Accept";
-        const confidence =
-        getNumber(
-          top.ai_case_type_confidence,
-          nested.ai_case_type_confidence,
-          aiScreeningNotes.case_type_confidence
-        );
-        const screeningScore =
-        getNumber(
-          top.screening_score,
-          nested.screening_score,
-          sourceCase?.screening_score,
-          aiScreeningNotes.viability_score
-        );
-        const estimatedCaseValue =
-        getNumber(
-          top.estimated_case_value,
-          nested.estimated_case_value,
-          sourceCase?.estimated_case_value
-        );
-        const liabilityAssessment =
-        getString(
-          top.liability_assessment,
-          nested.liability_assessment,
-          sourceCase?.liability_assessment,
-          aiScreeningNotes.liability_assessment
-        );
-        const injurySeverity =
-        getString(
-          top.injury_severity,
-          nested.injury_severity,
-          sourceCase?.injury_severity,
-          aiScreeningNotes.injury_severity
-        );
-        const redFlags = Array.isArray(aiScreeningNotes.red_flags)
-        ? aiScreeningNotes.red_flags.filter(
-            (flag): flag is string =>
-              typeof flag === "string" && flag.trim().length > 0
-          )
-        : [];
-          const strategyParts = [
-  screeningScore ? `Screening score: ${screeningScore}/100` : null,
-  estimatedCaseValue ? `Estimated case value: ${estimatedCaseValue}` : null,
-  liabilityAssessment ? `Liability: ${liabilityAssessment}` : null,
-  injurySeverity ? `Injury severity: ${injurySeverity}` : null,
-  confidence ? `Case type confidence: ${confidence}` : null,
-  redFlags.length > 0 ? `Red flags: ${redFlags.join(", ")}` : null,
-  aiScreeningNotes.reasoning && aiScreeningNotes.reasoning !== aiSummary
-    ? `Reasoning: ${aiScreeningNotes.reasoning}`
-    : null,
-]
-  .filter(Boolean)
-  .join("\n");
-    const strategyMemo = `${recommendation === "Accept" ? "Accept" : "Reject"} - ${strategyParts}`;
+
+    const confidence =
+      getNumber(
+        lead.ai_case_type_confidence,
+        top.ai_case_type_confidence,
+        nested.ai_case_type_confidence,
+        aiScreeningNotes.case_type_confidence
+      );
+
+    const screeningScore =
+      getNumber(
+        lead.screening_score,
+        top.screening_score,
+        nested.screening_score,
+        sourceCase?.screening_score,
+        aiScreeningNotes.viability_score
+      );
+
+    const estimatedCaseValue =
+      getNumber(
+        lead.estimated_case_value,
+        top.estimated_case_value,
+        nested.estimated_case_value,
+        sourceCase?.estimated_case_value,
+        aiScreeningNotes.estimated_value_high,
+        aiScreeningNotes.estimated_value_low
+      );
+
+    const liabilityAssessment =
+      getString(
+        lead.liability_assessment,
+        top.liability_assessment,
+        nested.liability_assessment,
+        sourceCase?.liability_assessment,
+        aiScreeningNotes.liability_assessment
+      );
+
+    const injurySeverity =
+      getString(
+        lead.injury_severity,
+        top.injury_severity,
+        nested.injury_severity,
+        sourceCase?.injury_severity,
+        aiScreeningNotes.injury_severity
+      );
+
+    const redFlags = Array.isArray(aiScreeningNotes.red_flags)
+      ? aiScreeningNotes.red_flags.filter(
+          (flag): flag is string =>
+            typeof flag === "string" && flag.trim().length > 0
+        )
+      : [];
+
+    const strategyParts = [
+      screeningScore ? `Screening score: ${screeningScore}/100` : null,
+      estimatedCaseValue
+        ? `Estimated case value: $${estimatedCaseValue.toLocaleString()}`
+        : null,
+      liabilityAssessment ? `Liability: ${liabilityAssessment}` : null,
+      injurySeverity ? `Injury severity: ${injurySeverity}` : null,
+      confidence ? `Case type confidence: ${confidence}` : null,
+      redFlags.length > 0 ? `Red flags: ${redFlags.join(", ")}` : null,
+      aiScreeningNotes.reasoning && aiScreeningNotes.reasoning !== aiSummary
+        ? `Reasoning: ${aiScreeningNotes.reasoning}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const strategyMemo = strategyParts
+      ? `${recommendation} - ${strategyParts}`
+      : `${recommendation} - No strategy memo available.`;
+
     const source =
       getString(
         lead.utm_source,
@@ -312,13 +338,7 @@ export default async function LeadsPage() {
         top.source_type
       ) ?? "AI Intake";
 
-    const score =
-      getNumber(
-        top.screening_score,
-        nested.screening_score,
-        sourceCase?.screening_score,
-        aiScreeningNotes.viability_score
-      ) ?? 70;
+    const score = screeningScore ?? 70;
 
     const priorityRaw = getString(nested.priority, top.priority);
     const priority: "Low" | "Medium" | "High" =
@@ -327,10 +347,7 @@ export default async function LeadsPage() {
         : scoreToPriority(score);
 
     const injuriesArray = parseInjuries(
-      lead.injuries ??
-        nested.injuries ??
-        top.injuries ??
-        getString(sourceCase?.injury_severity)
+      lead.injuries ?? nested.injuries ?? top.injuries
     );
 
     const evidenceFiles = Array.isArray(nested.evidence_files)
@@ -352,7 +369,7 @@ export default async function LeadsPage() {
       email: lead.email || sourceCase?.email || "",
       source,
       priority,
-      score: screeningScore ?? 70,
+      score,
       caseType: accidentType,
       strategyMemo,
       incidentDescription,
@@ -363,16 +380,19 @@ export default async function LeadsPage() {
       treatment,
       aiSummary,
       aiRecommendation:
-        getString(aiScreeningNotes.recommendation)?.toLowerCase() === "reject"
-          ? ("Reject" as const)
-          : ("Accept" as const),
+        recommendation === "Reject" ? ("Reject" as const) : ("Accept" as const),
       evidenceFiles,
       status: statusMap[lead.status] ?? "New Intake",
       submittedAt: formatCentralTime(lead.created_at),
       lang:
         lead.lang ??
         sourceCase?.client_language ??
-        getString(top.client_language, top.lang, nested.client_language, nested.lang) ??
+        getString(
+          top.client_language,
+          top.lang,
+          nested.client_language,
+          nested.lang
+        ) ??
         "",
       utmSource:
         lead.utm_source ?? getString(top.utm_source, nested.utm_source) ?? "",
