@@ -1,425 +1,185 @@
-"use client";
+import { notFound } from "next/navigation";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import CaseIncidentTab from "@/app/components/CaseIncidentTab";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-
-type IncidentFormData = {
-  accident_date: string;
-  incident_time: string;
-  incident_type: string;
-  location: string;
-  city: string;
-  state: string;
-  client_role: string;
-  defendant: string;
-  police_report_number: string;
-  investigating_agency: string;
-  witness_info: string;
-  conditions: string;
-  narrative: string;
-  liability_notes: string;
+type PageProps = {
+  params: Promise<{ caseId: string }>;
 };
 
-type Props = {
-  caseNumber: string;
-  initialData: IncidentFormData;
-};
-
-function displayValue(value: string) {
-  return value?.trim() ? value : "—";
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <tr className="border-b border-[#eeeeee] last:border-b-0">
-      <td className="w-56 bg-[#fafafa] px-4 py-3 font-medium text-[#2b2b2b]">
-        {label}
-      </td>
-      <td className="px-4 py-3 text-[#444444]">{value}</td>
-    </tr>
-  );
-}
-
-export default function CaseIncidentTab({ caseNumber, initialData }: Props) {
-  const router = useRouter();
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<IncidentFormData>(initialData);
-
-  useEffect(() => {
-    setForm(initialData);
-  }, [initialData]);
-
-  function updateField<K extends keyof IncidentFormData>(
-    key: K,
-    value: IncidentFormData[K]
-  ) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-
-    try {
-      const res = await fetch(`/api/cases/${caseNumber}/incident`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(form),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result?.error || "Failed to update incident information");
-      }
-
-      setIsEditing(false);
-      router.refresh();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update incident information"
-      );
-    } finally {
-      setSaving(false);
+function getString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
     }
   }
+  return "";
+}
 
-  function handleCancel() {
-    setForm(initialData);
-    setIsEditing(false);
-    setError(null);
+function splitLocationParts(location: string) {
+  if (!location.trim()) {
+    return {
+      location: "",
+      city: "",
+      state: "",
+    };
   }
 
-  const fullLocation = [form.location, form.city, form.state]
-    .filter((part) => part?.trim())
-    .join(", ");
+  const parts = location.split(",").map((part) => part.trim()).filter(Boolean);
+
+  if (parts.length >= 3) {
+    return {
+      location: parts[0],
+      city: parts[1],
+      state: parts.slice(2).join(", "),
+    };
+  }
+
+  if (parts.length === 2) {
+    return {
+      location: parts[0],
+      city: parts[1],
+      state: "",
+    };
+  }
+
+  return {
+    location,
+    city: "",
+    state: "",
+  };
+}
+
+export default async function CaseIncidentPage({ params }: PageProps) {
+  const { caseId } = await params;
+
+  const { data: caseRecord, error } = await supabaseAdmin
+    .from("cases")
+    .select("*")
+    .eq("case_number", caseId)
+    .single();
+
+  if (error || !caseRecord) {
+    notFound();
+  }
+
+  const raw =
+    caseRecord.raw_payload && typeof caseRecord.raw_payload === "object"
+      ? (caseRecord.raw_payload as Record<string, unknown>)
+      : {};
+
+  const nested =
+    raw.raw_payload && typeof raw.raw_payload === "object"
+      ? (raw.raw_payload as Record<string, unknown>)
+      : {};
+
+  const incident =
+    raw.incident && typeof raw.incident === "object"
+      ? (raw.incident as Record<string, unknown>)
+      : {};
+
+  const resolvedLocation =
+    getString(
+      caseRecord.accident_location,
+      raw.accident_location,
+      nested.accident_location,
+      raw.location,
+      nested.location,
+      incident.location
+    ) || "";
+
+  const locationParts = splitLocationParts(resolvedLocation);
+
+  const initialData = {
+    accident_date: caseRecord.accident_date
+      ? String(caseRecord.accident_date)
+      : getString(raw.accident_date, nested.accident_date, incident.accident_date),
+
+    incident_time: getString(
+      incident.incident_time,
+      raw.incident_time,
+      nested.incident_time
+    ),
+
+    incident_type:
+      getString(
+        caseRecord.case_type,
+        raw.accident_type,
+        nested.accident_type,
+        incident.incident_type
+      ) || "",
+
+    location: locationParts.location,
+    city: locationParts.city,
+    state: locationParts.state,
+
+    client_role: getString(
+      incident.client_role,
+      raw.client_role,
+      nested.client_role
+    ),
+
+    defendant: getString(
+      raw.defendant,
+      nested.defendant,
+      raw.at_fault_party,
+      nested.at_fault_party,
+      incident.defendant
+    ),
+
+    police_report_number: getString(
+      caseRecord.police_report_number,
+      raw.police_report_number,
+      nested.police_report_number,
+      incident.police_report_number
+    ),
+
+    investigating_agency: getString(
+      incident.investigating_agency,
+      raw.investigating_agency,
+      nested.investigating_agency
+    ),
+
+    witness_info: getString(
+      incident.witness_info,
+      raw.witness_info,
+      nested.witness_info
+    ),
+
+    conditions: getString(
+      incident.conditions,
+      raw.conditions,
+      nested.conditions
+    ),
+
+    narrative: getString(
+      caseRecord.accident_description,
+      raw.accident_description,
+      nested.accident_description,
+      raw.incident_description,
+      nested.incident_description,
+      raw.intake_notes,
+      nested.intake_notes,
+      incident.narrative
+    ),
+
+    liability_notes: getString(
+      caseRecord.liability_assessment,
+      raw.liability_assessment,
+      nested.liability_assessment,
+      incident.liability_notes
+    ),
+  };
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-[#e5e5e5] bg-white p-5">
-        <div className="flex items-center justify-between border-b border-[#eeeeee] pb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-[#2b2b2b]">
-              Incident Details
-            </h2>
-            <p className="mt-1 text-sm text-[#666666]">
-              Liability facts, scene information, and incident narrative.
-            </p>
-          </div>
-
-          {!isEditing ? (
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08]"
-            >
-              Edit Incident
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {error ? (
-          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
-        ) : null}
-
-        {!isEditing ? (
-          <div className="mt-5 space-y-5">
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              <div className="overflow-hidden rounded-lg border border-[#e5e5e5]">
-                <div className="border-b border-[#eeeeee] bg-[#fcfcfc] px-4 py-3">
-                  <h3 className="text-sm font-semibold text-[#2b2b2b]">
-                    Scene Summary
-                  </h3>
-                </div>
-                <table className="min-w-full text-sm">
-                  <tbody>
-                    <InfoRow
-                      label="Date of Incident"
-                      value={displayValue(form.accident_date)}
-                    />
-                    <InfoRow
-                      label="Incident Time"
-                      value={displayValue(form.incident_time)}
-                    />
-                    <InfoRow
-                      label="Incident Type"
-                      value={displayValue(form.incident_type)}
-                    />
-                    <InfoRow
-                      label="Location"
-                      value={displayValue(fullLocation)}
-                    />
-                    <InfoRow
-                      label="Client Role"
-                      value={displayValue(form.client_role)}
-                    />
-                    <InfoRow
-                      label="Defendant / At-Fault Party"
-                      value={displayValue(form.defendant)}
-                    />
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="overflow-hidden rounded-lg border border-[#e5e5e5]">
-                <div className="border-b border-[#eeeeee] bg-[#fcfcfc] px-4 py-3">
-                  <h3 className="text-sm font-semibold text-[#2b2b2b]">
-                    Investigation
-                  </h3>
-                </div>
-                <table className="min-w-full text-sm">
-                  <tbody>
-                    <InfoRow
-                      label="Police Report Number"
-                      value={displayValue(form.police_report_number)}
-                    />
-                    <InfoRow
-                      label="Investigating Agency"
-                      value={displayValue(form.investigating_agency)}
-                    />
-                    <InfoRow
-                      label="Witness Information"
-                      value={displayValue(form.witness_info)}
-                    />
-                    <InfoRow
-                      label="Conditions"
-                      value={displayValue(form.conditions)}
-                    />
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-[#e5e5e5] bg-[#fcfcfc] p-4">
-              <h3 className="text-sm font-semibold text-[#2b2b2b]">
-                Incident Narrative
-              </h3>
-              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#444444]">
-                {displayValue(form.narrative)}
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-[#e5e5e5] bg-[#fcfcfc] p-4">
-              <h3 className="text-sm font-semibold text-[#2b2b2b]">
-                Liability Notes
-              </h3>
-              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#444444]">
-                {displayValue(form.liability_notes)}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-5 space-y-6">
-            <div>
-              <h3 className="mb-4 text-sm font-semibold text-[#2b2b2b]">
-                Scene Summary
-              </h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Date of Incident
-                  </label>
-                  <input
-                    type="date"
-                    value={form.accident_date}
-                    onChange={(e) => updateField("accident_date", e.target.value)}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Incident Time
-                  </label>
-                  <input
-                    type="time"
-                    value={form.incident_time}
-                    onChange={(e) => updateField("incident_time", e.target.value)}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Incident Type
-                  </label>
-                  <input
-                    value={form.incident_type}
-                    onChange={(e) => updateField("incident_type", e.target.value)}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Location
-                  </label>
-                  <input
-                    value={form.location}
-                    onChange={(e) => updateField("location", e.target.value)}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    City
-                  </label>
-                  <input
-                    value={form.city}
-                    onChange={(e) => updateField("city", e.target.value)}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    State
-                  </label>
-                  <input
-                    value={form.state}
-                    onChange={(e) => updateField("state", e.target.value)}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Client Role
-                  </label>
-                  <input
-                    value={form.client_role}
-                    onChange={(e) => updateField("client_role", e.target.value)}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Defendant / At-Fault Party
-                  </label>
-                  <input
-                    value={form.defendant}
-                    onChange={(e) => updateField("defendant", e.target.value)}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="mb-4 text-sm font-semibold text-[#2b2b2b]">
-                Investigation
-              </h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Police Report Number
-                  </label>
-                  <input
-                    value={form.police_report_number}
-                    onChange={(e) =>
-                      updateField("police_report_number", e.target.value)
-                    }
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Investigating Agency
-                  </label>
-                  <input
-                    value={form.investigating_agency}
-                    onChange={(e) =>
-                      updateField("investigating_agency", e.target.value)
-                    }
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Witness Information
-                  </label>
-                  <textarea
-                    value={form.witness_info}
-                    onChange={(e) => updateField("witness_info", e.target.value)}
-                    rows={3}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-3"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                    Conditions
-                  </label>
-                  <textarea
-                    value={form.conditions}
-                    onChange={(e) => updateField("conditions", e.target.value)}
-                    rows={3}
-                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-3"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                Incident Narrative
-              </label>
-              <textarea
-                value={form.narrative}
-                onChange={(e) => updateField("narrative", e.target.value)}
-                rows={6}
-                className="w-full rounded-md border border-[#d9d9d9] px-4 py-3"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-                Liability Notes
-              </label>
-              <textarea
-                value={form.liability_notes}
-                onChange={(e) => updateField("liability_notes", e.target.value)}
-                rows={5}
-                className="w-full rounded-md border border-[#d9d9d9] px-4 py-3"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <CaseIncidentTab
+      caseNumber={caseRecord.case_number}
+      initialData={initialData}
+    />
   );
 }
