@@ -245,12 +245,12 @@ export default async function LeadsPage() {
       ) ?? "";
 
     const aiSummary =
-      getString(
-        lead.ai_summary,
-        top.ai_summary,
-        nested.ai_summary,
-        aiScreeningNotes.reasoning
-      ) ?? "No AI summary available.";
+  getString(
+    lead.ai_summary,
+    aiScreeningNotes.reasoning,
+    top.ai_summary,
+    nested.ai_summary
+  ) ?? "No AI summary available.";
 
     const recommendation =
       getString(aiScreeningNotes.recommendation)?.toLowerCase() === "reject"
