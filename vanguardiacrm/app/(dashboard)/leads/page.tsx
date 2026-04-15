@@ -244,13 +244,10 @@ export default async function LeadsPage() {
         sourceCase?.accident_description
       ) ?? "";
 
-    const aiSummary =
-  getString(
-    lead.ai_summary,
-    aiScreeningNotes.reasoning,
-    top.ai_summary,
-    nested.ai_summary
-  ) ?? "No AI summary available.";
+    const aiSummary = 
+      getString(aiScreeningNotes.reasoning) ||
+      getString(lead.ai_summary, top.ai_summary, nested.ai_summary) ||
+      "No AI summary provided.";
 
     const recommendation =
       getString(aiScreeningNotes.recommendation)?.toLowerCase() === "reject"
