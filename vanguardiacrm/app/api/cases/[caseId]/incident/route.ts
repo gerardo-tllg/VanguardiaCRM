@@ -86,6 +86,13 @@ export async function PATCH(req: Request, context: RouteContext) {
         getString(body.liability_notes) ?? existingCase.liability_assessment,
       raw_payload: nextRaw,
       updated_at: new Date().toISOString(),
+      incident_time: getString(body.incident_time) ?? existingCase.incident_time,
+      client_role: getString(body.client_role) ?? existingCase.client_role,
+      defendant: getString(body.defendant) ?? existingCase.defendant,
+      investigating_agency:
+        getString(body.investigating_agency) ?? existingCase.investigating_agency,
+      witness_info: getString(body.witness_info) ?? existingCase.witness_info,
+      conditions: getString(body.conditions) ?? existingCase.conditions,
     };
 
     const { data: updatedRows, error: updateError } = await supabaseAdmin
