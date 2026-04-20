@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import GlobalCaseSearch from "../components/GlobalCaseSearch";
+import GlobalCaseSearch from "./GlobalCaseSearch";
 
 export default function Topbar() {
   return (
