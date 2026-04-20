@@ -75,18 +75,7 @@ export default function CaseHeader({ caseData }: CaseHeaderProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
-              Search Other Cases
-            </label>
-            <input
-              type="text"
-              placeholder="Search other cases by client, DOI, or case type"
-              className="w-full rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
-            />
-          </div>
-
+        <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
               Search This Case
