@@ -1,8 +1,23 @@
-export default function CaseDocumentsPage() {
-  return (
-    <div className="rounded-xl border border-[#e5e5e5] bg-white p-5">
-      <h2 className="text-lg font-semibold text-[#2b2b2b]">Documents</h2>
-      <p className="mt-4 text-sm text-[#444444]">Documents page placeholder.</p>
-    </div>
-  );
-}
+import { notFound } from "next/navigation";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import CaseDocumentsTab from "@/app/components/CaseDocumentsTab";
+
+type PageProps = {
+  params: Promise<{ caseId: string }>;
+};
+
+export default async function CaseDocumentsPage({ params }: PageProps) {
+  const { caseId } = await params;
+
+  const { data: caseRecord, error } = await supabaseAdmin
+    .from("cases")
+    .select("case_number")
+    .eq("case_number", caseId)
+    .single();
+
+  if (error || !caseRecord) {
+    notFound();
+  }
+
+  return <CaseDocumentsTab caseNumber={caseRecord.case_number} />;
+};
