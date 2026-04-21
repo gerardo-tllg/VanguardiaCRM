@@ -15,60 +15,56 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   try {
     const { caseId, documentId } = await context.params;
 
-    // ✅ FIX: use id instead of case_number
-    const { data: caseRecord, error: caseError } = await supabaseAdmin
-      .from("cases")
-      .select("id")
-      .eq("id", caseId)
-      .single();
-
-    if (caseError || !caseRecord) {
-      return NextResponse.json({ error: "Case not found" }, { status: 404 });
-    }
-
     const { data: doc, error: docError } = await supabaseAdmin
       .from("case_documents")
-      .select("original_filename, storage_path, mime_type")
+      .select("id, case_id, original_filename, storage_path, mime_type")
       .eq("id", documentId)
-      .eq("case_id", caseRecord.id)
+      .eq("case_id", caseId)
       .single();
 
     if (docError || !doc) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Document not found for this case" },
+        { status: 404 }
+      );
     }
 
     if (!doc.storage_path) {
       return NextResponse.json(
-        { error: "Missing storage path" },
+        { error: "Document is missing a storage path" },
         { status: 400 }
       );
     }
 
-    const { data: fileData, error: downloadError } =
-      await supabaseAdmin.storage
-        .from("case-documents")
-        .download(doc.storage_path);
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+      .from("case-documents")
+      .download(doc.storage_path);
 
     if (downloadError || !fileData) {
       return NextResponse.json(
-        { error: downloadError?.message || "Download failed" },
+        { error: downloadError?.message || "Failed to download file" },
         { status: 500 }
       );
     }
 
-    const buffer = await fileData.arrayBuffer();
+    const arrayBuffer = await fileData.arrayBuffer();
     const filename = doc.original_filename || "document";
     const encoded = encodeFilename(filename);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(arrayBuffer, {
+      status: 200,
       headers: {
         "Content-Type": doc.mime_type || "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encoded}`,
+        "Content-Length": String(arrayBuffer.byteLength),
+        "Content-Disposition": `attachment; filename="${filename.replace(/"/g, "")}"; filename*=UTF-8''${encoded}`,
+        "Cache-Control": "private, no-store, no-cache, must-revalidate",
       },
     });
-  } catch (err) {
+  } catch (error) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Server error" },
+      {
+        error: error instanceof Error ? error.message : "Download failed",
+      },
       { status: 500 }
     );
   }
