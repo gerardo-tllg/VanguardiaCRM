@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,7 +32,7 @@ const DOCUMENT_TYPES = [
   "lor",
   "police-report",
   "photo",
-];
+] as const;
 
 function formatFileSize(size: number | null) {
   if (!size) return "—";
@@ -49,9 +48,51 @@ function formatDate(value: string) {
   });
 }
 
-async function parseJsonResponse(res: Response) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isCaseDocument(value: unknown): value is CaseDocument {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.created_at === "string" &&
+    typeof value.original_filename === "string" &&
+    (typeof value.mime_type === "string" || value.mime_type === null) &&
+    (typeof value.size_bytes === "number" || value.size_bytes === null) &&
+    typeof value.document_type === "string" &&
+    (typeof value.uploaded_by === "string" || value.uploaded_by === null) &&
+    (typeof value.notes === "string" || value.notes === null) &&
+    (typeof value.folder_id === "string" || value.folder_id === null)
+  );
+}
+
+function isDocumentFolder(value: unknown): value is DocumentFolder {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.sort_order === "number"
+  );
+}
+
+function getCaseDocuments(value: unknown): CaseDocument[] {
+  return Array.isArray(value) ? value.filter(isCaseDocument) : [];
+}
+
+function getDocumentFolders(value: unknown): DocumentFolder[] {
+  return Array.isArray(value) ? value.filter(isDocumentFolder) : [];
+}
+
+function getString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+async function parseJsonResponse(res: Response): Promise<Record<string, unknown>> {
   const text = await res.text();
-  let data: any = {};
+  let data: unknown = {};
 
   try {
     data = text ? JSON.parse(text) : {};
@@ -59,8 +100,17 @@ async function parseJsonResponse(res: Response) {
     throw new Error("Server returned a non-JSON response. Check the API route.");
   }
 
+  if (!isRecord(data)) {
+    throw new Error("Server returned an invalid JSON object.");
+  }
+
   if (!res.ok) {
-    throw new Error(data?.error || "Request failed");
+    const message =
+      typeof data.error === "string" && data.error.trim()
+        ? data.error
+        : "Request failed";
+
+    throw new Error(message);
   }
 
   return data;
@@ -82,7 +132,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   const [showUploadPanel, setShowUploadPanel] = useState(false);
   const [showFolderPanel, setShowFolderPanel] = useState(false);
 
-  const [documentType, setDocumentType] = useState("general");
+  const [documentType, setDocumentType] = useState<string>("general");
   const [notes, setNotes] = useState("");
   const [folderId, setFolderId] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
@@ -93,7 +143,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   const [selectedFolderFilter, setSelectedFolderFilter] = useState<string>("all");
 
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
-  const [editDocumentType, setEditDocumentType] = useState("general");
+  const [editDocumentType, setEditDocumentType] = useState<string>("general");
   const [editNotes, setEditNotes] = useState("");
   const [editFolderId, setEditFolderId] = useState<string>("");
 
@@ -116,8 +166,8 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         const docsData = await parseJsonResponse(docsRes);
         const foldersData = await parseJsonResponse(foldersRes);
 
-        setDocuments(docsData.documents ?? []);
-        setFolders(foldersData.folders ?? []);
+        setDocuments(getCaseDocuments(docsData.documents));
+        setFolders(getDocumentFolders(foldersData.folders));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load documents");
       } finally {
@@ -132,7 +182,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   );
 
   useEffect(() => {
-    loadDocuments("initial");
+    void loadDocuments("initial");
   }, [loadDocuments]);
 
   function resetUploadForm() {
@@ -200,10 +250,12 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
       });
 
       const data = await parseJsonResponse(res);
+      const folder = isRecord(data.folder) ? data.folder : null;
+      const newFolderId = folder && typeof folder.id === "string" ? folder.id : "all";
 
       setNewFolderName("");
       setShowFolderPanel(false);
-      setSelectedFolderFilter(data.folder?.id ?? "all");
+      setSelectedFolderFilter(newFolderId);
       await loadDocuments("refresh");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create folder");
@@ -218,9 +270,10 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         `/api/cases/${caseNumber}/documents/${documentId}/download`
       );
       const data = await parseJsonResponse(res);
+      const url = getString(data.url);
 
-      if (data.url) {
-        window.open(data.url, "_blank", "noopener,noreferrer");
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
@@ -233,9 +286,10 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         `/api/cases/${caseNumber}/documents/${documentId}/download`
       );
       const data = await parseJsonResponse(res);
+      const url = getString(data.url);
 
-      if (data.url) {
-        window.open(data.url, "_blank", "noopener,noreferrer");
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Preview failed");
@@ -430,7 +484,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => loadDocuments("refresh")}
+                onClick={() => void loadDocuments("refresh")}
                 disabled={refreshing || loading}
                 className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
               >
