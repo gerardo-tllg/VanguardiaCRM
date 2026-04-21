@@ -9,21 +9,45 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   try {
     const { caseId, documentId } = await context.params;
 
-    const { data: doc, error: docError } = await supabaseAdmin
+    const { data: docById, error: docByIdError } = await supabaseAdmin
       .from("case_documents")
       .select("id, case_id, storage_path, original_filename")
       .eq("id", documentId)
-      .eq("case_id", caseId)
-      .single();
+      .maybeSingle();
 
-    if (docError || !doc) {
+    if (docByIdError) {
       return NextResponse.json(
-        { error: "Document not found for this case" },
+        { error: docByIdError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!docById) {
+      return NextResponse.json(
+        {
+          error: "Document not found by id",
+          debug: { caseId, documentId },
+        },
         { status: 404 }
       );
     }
 
-    if (!doc.storage_path) {
+    if (docById.case_id !== caseId) {
+      return NextResponse.json(
+        {
+          error: "Document exists, but caseId does not match",
+          debug: {
+            routeCaseId: caseId,
+            documentId,
+            actualDocumentCaseId: docById.case_id,
+            filename: docById.original_filename,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!docById.storage_path) {
       return NextResponse.json(
         { error: "Document is missing a storage path" },
         { status: 400 }
@@ -32,7 +56,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
     const { data: signedData, error: signedError } = await supabaseAdmin.storage
       .from("case-documents")
-      .createSignedUrl(doc.storage_path, 60 * 5);
+      .createSignedUrl(docById.storage_path, 60 * 5);
 
     if (signedError || !signedData?.signedUrl) {
       return NextResponse.json(
@@ -41,14 +65,11 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        url: signedData.signedUrl,
-        filename: doc.original_filename ?? null,
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({
+      success: true,
+      url: signedData.signedUrl,
+      filename: docById.original_filename ?? null,
+    });
   } catch (error) {
     return NextResponse.json(
       {
