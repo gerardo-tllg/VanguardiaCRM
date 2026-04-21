@@ -1,17 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type RouteContext = {
-  params: { caseId: string };
+  params: Promise<{ caseId: string }>;
 };
 
 function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-export async function GET(_req: Request, context: RouteContext) {
+export async function GET(_req: NextRequest, context: RouteContext) {
   try {
-    const { caseId } = context.params;
+    const { caseId } = await context.params;
 
     const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
@@ -42,7 +42,7 @@ export async function GET(_req: Request, context: RouteContext) {
   }
 }
 
-export async function POST(req: Request, context: RouteContext) {
+export async function POST(req: NextRequest, context: RouteContext) {
   try {
     const { caseId } = await context.params;
 
