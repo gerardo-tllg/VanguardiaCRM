@@ -98,6 +98,7 @@ export async function POST(req: Request, context: RouteContext) {
         original_filename: file.name,
         storage_path: storagePath,
         mime_type: file.type || null,
+        document_url: storagePath,
         size_bytes: file.size,
         document_type: documentType,
         notes,
