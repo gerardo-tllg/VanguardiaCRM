@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type RouteContext = {
-  params: Promise<{ caseId: string }>;
+  params: { caseId: string };
 };
 
 function sanitizeFileName(name: string) {
@@ -11,7 +11,7 @@ function sanitizeFileName(name: string) {
 
 export async function GET(_req: Request, context: RouteContext) {
   try {
-    const { caseId } = await context.params;
+    const { caseId } = context.params;
 
     const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
