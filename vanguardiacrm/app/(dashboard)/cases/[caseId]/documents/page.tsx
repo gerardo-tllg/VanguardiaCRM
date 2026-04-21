@@ -19,5 +19,5 @@ export default async function CaseDocumentsPage({ params }: PageProps) {
     notFound();
   }
 
-  return <CaseDocumentsTab caseNumber={caseRecord.case_number} />;
+  return <CaseDocumentsTab caseId={caseRecord.case_number} />;
 };
