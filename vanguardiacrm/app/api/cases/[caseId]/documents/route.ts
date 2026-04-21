@@ -9,7 +9,6 @@ function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-// GET → list documents for a case
 export async function GET(_req: Request, context: RouteContext) {
   try {
     const { caseId } = await context.params;
@@ -43,7 +42,6 @@ export async function GET(_req: Request, context: RouteContext) {
   }
 }
 
-// POST → upload document
 export async function POST(req: Request, context: RouteContext) {
   try {
     const { caseId } = await context.params;
@@ -65,8 +63,10 @@ export async function POST(req: Request, context: RouteContext) {
       return NextResponse.json({ error: "File is required" }, { status: 400 });
     }
 
-    const category =
-      typeof formData.get("category") === "string"
+    const documentType =
+      typeof formData.get("document_type") === "string"
+        ? String(formData.get("document_type"))
+        : typeof formData.get("category") === "string"
         ? String(formData.get("category"))
         : "general";
 
@@ -81,7 +81,6 @@ export async function POST(req: Request, context: RouteContext) {
     const safeName = sanitizeFileName(file.name);
     const storagePath = `${caseRecord.case_number}/${Date.now()}-${safeName}`;
 
-    // upload to storage
     const { error: uploadError } = await supabaseAdmin.storage
       .from("case-documents")
       .upload(storagePath, fileBuffer, {
@@ -92,7 +91,6 @@ export async function POST(req: Request, context: RouteContext) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });
     }
 
-    // insert DB record
     const { data: docRow, error: insertError } = await supabaseAdmin
       .from("case_documents")
       .insert({
@@ -101,13 +99,15 @@ export async function POST(req: Request, context: RouteContext) {
         storage_path: storagePath,
         mime_type: file.type || null,
         size_bytes: file.size,
-        category,
+        document_type: documentType,
         notes,
       })
       .select()
       .single();
 
     if (insertError || !docRow) {
+      await supabaseAdmin.storage.from("case-documents").remove([storagePath]);
+
       return NextResponse.json(
         { error: insertError?.message || "Failed to save document" },
         { status: 500 }

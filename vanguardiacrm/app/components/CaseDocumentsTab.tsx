@@ -8,7 +8,7 @@ type CaseDocument = {
   original_filename: string;
   mime_type: string | null;
   size_bytes: number | null;
-  category: string;
+  document_type: string;
   uploaded_by: string | null;
   notes: string | null;
 };
@@ -38,10 +38,11 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [category, setCategory] = useState("general");
+  const [documentType, setDocumentType] = useState("general");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
 
   const loadDocuments = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -81,6 +82,17 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
     loadDocuments("initial");
   }, [loadDocuments]);
 
+  function resetForm() {
+    setFile(null);
+    setNotes("");
+    setDocumentType("general");
+    setDragActive(false);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
   async function handleUpload() {
     if (!file) return;
 
@@ -90,7 +102,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("category", category);
+      formData.append("document_type", documentType);
       formData.append("notes", notes);
 
       const res = await fetch(`/api/cases/${caseNumber}/documents`, {
@@ -104,14 +116,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         throw new Error(data?.error || "Upload failed");
       }
 
-      setFile(null);
-      setNotes("");
-      setCategory("general");
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-
+      resetForm();
       await loadDocuments("refresh");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -139,6 +144,12 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
     }
   }
 
+  function handleFileSelect(nextFile: File | null) {
+    if (!nextFile) return;
+    setFile(nextFile);
+    setError(null);
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
@@ -158,11 +169,11 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-1">
             <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-              Category
+              Document Type
             </label>
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              value={documentType}
+              onChange={(e) => setDocumentType(e.target.value)}
               className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
             >
               <option value="general">General</option>
@@ -191,17 +202,65 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
             <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
               File
             </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
-            />
-            {file ? (
-              <p className="mt-2 text-sm text-[#6b6b6b]">
-                Selected: {file.name}
+
+            <div
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragActive(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragActive(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragActive(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragActive(false);
+
+                const droppedFile = e.dataTransfer.files?.[0] ?? null;
+                handleFileSelect(droppedFile);
+              }}
+              className={`rounded-xl border-2 border-dashed p-6 text-center transition ${
+                dragActive
+                  ? "border-[#4b0a06] bg-[#fcf6f5]"
+                  : "border-[#d9d9d9] bg-[#fafafa]"
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+              />
+
+              <p className="text-sm font-medium text-[#2b2b2b]">
+                Drag and drop a file here
               </p>
-            ) : null}
+              <p className="mt-1 text-sm text-[#6b6b6b]">
+                or choose one manually
+              </p>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-4 rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+              >
+                Choose File
+              </button>
+
+              {file ? (
+                <div className="mt-4 rounded-md border border-[#e5e5e5] bg-white px-4 py-3 text-sm text-[#444444]">
+                  Selected: <span className="font-medium">{file.name}</span>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -211,7 +270,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
           </p>
         ) : null}
 
-        <div className="mt-5">
+        <div className="mt-5 flex items-center gap-3">
           <button
             type="button"
             onClick={handleUpload}
@@ -220,6 +279,16 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
           >
             {uploading ? "Uploading..." : "Upload Document"}
           </button>
+
+          {file ? (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+            >
+              Clear
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -243,7 +312,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
               <thead className="border-b border-[#e5e5e5] bg-[#fafafa] text-left text-[#2b2b2b]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">File</th>
-                  <th className="px-4 py-3 font-semibold">Category</th>
+                  <th className="px-4 py-3 font-semibold">Type</th>
                   <th className="px-4 py-3 font-semibold">Size</th>
                   <th className="px-4 py-3 font-semibold">Uploaded</th>
                   <th className="px-4 py-3 font-semibold">Notes</th>
@@ -259,7 +328,9 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
                     <td className="px-4 py-3 text-[#2b2b2b]">
                       {doc.original_filename}
                     </td>
-                    <td className="px-4 py-3 text-[#555555]">{doc.category}</td>
+                    <td className="px-4 py-3 text-[#555555]">
+                      {doc.document_type}
+                    </td>
                     <td className="px-4 py-3 text-[#555555]">
                       {formatFileSize(doc.size_bytes)}
                     </td>
