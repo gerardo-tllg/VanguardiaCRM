@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,7 +13,6 @@ type CaseDocument = {
   uploaded_by: string | null;
   notes: string | null;
   folder_id: string | null;
-  document_url?: string | null;
 };
 
 type DocumentFolder = {
@@ -49,6 +49,23 @@ function formatDate(value: string) {
   });
 }
 
+async function parseJsonResponse(res: Response) {
+  const text = await res.text();
+  let data: any = {};
+
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error("Server returned a non-JSON response. Check the API route.");
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || "Request failed");
+  }
+
+  return data;
+}
+
 export default function CaseDocumentsTab({ caseNumber }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -61,6 +78,9 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [savingDocumentId, setSavingDocumentId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
+
+  const [showUploadPanel, setShowUploadPanel] = useState(false);
+  const [showFolderPanel, setShowFolderPanel] = useState(false);
 
   const [documentType, setDocumentType] = useState("general");
   const [notes, setNotes] = useState("");
@@ -93,16 +113,8 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
           fetch(`/api/cases/${caseNumber}/folders`, { cache: "no-store" }),
         ]);
 
-        const docsData = await docsRes.json();
-        const foldersData = await foldersRes.json();
-
-        if (!docsRes.ok) {
-          throw new Error(docsData?.error || "Failed to load documents");
-        }
-
-        if (!foldersRes.ok) {
-          throw new Error(foldersData?.error || "Failed to load folders");
-        }
+        const docsData = await parseJsonResponse(docsRes);
+        const foldersData = await parseJsonResponse(foldersRes);
 
         setDocuments(docsData.documents ?? []);
         setFolders(foldersData.folders ?? []);
@@ -152,22 +164,17 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
       formData.append("file", file);
       formData.append("document_type", documentType);
       formData.append("notes", notes);
-      if (folderId) {
-        formData.append("folder_id", folderId);
-      }
+      if (folderId) formData.append("folder_id", folderId);
 
       const res = await fetch(`/api/cases/${caseNumber}/documents`, {
         method: "POST",
         body: formData,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Upload failed");
-      }
+      await parseJsonResponse(res);
 
       resetUploadForm();
+      setShowUploadPanel(false);
       await loadDocuments("refresh");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -189,18 +196,14 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: trimmed,
-        }),
+        body: JSON.stringify({ name: trimmed }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to create folder");
-      }
+      const data = await parseJsonResponse(res);
 
       setNewFolderName("");
+      setShowFolderPanel(false);
+      setSelectedFolderFilter(data.folder?.id ?? "all");
       await loadDocuments("refresh");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create folder");
@@ -214,11 +217,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
       const res = await fetch(
         `/api/cases/${caseNumber}/documents/${documentId}/download`
       );
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to download document");
-      }
+      const data = await parseJsonResponse(res);
 
       if (data.url) {
         window.open(data.url, "_blank", "noopener,noreferrer");
@@ -233,11 +232,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
       const res = await fetch(
         `/api/cases/${caseNumber}/documents/${documentId}/download`
       );
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to preview document");
-      }
+      const data = await parseJsonResponse(res);
 
       if (data.url) {
         window.open(data.url, "_blank", "noopener,noreferrer");
@@ -281,11 +276,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         }
       );
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to update document");
-      }
+      await parseJsonResponse(res);
 
       cancelEditingDocument();
       await loadDocuments("refresh");
@@ -313,11 +304,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         }
       );
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to delete document");
-      }
+      await parseJsonResponse(res);
 
       if (editingDocumentId === documentId) {
         cancelEditingDocument();
@@ -346,196 +333,61 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   }, [documents, selectedFolderFilter]);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-[#2b2b2b]">Upload Document</h2>
-
+    <div className="grid grid-cols-12 gap-6">
+      <div className="col-span-3 rounded-xl border border-[#e5e5e5] bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-[#2b2b2b]">Folders</h2>
           <button
             type="button"
-            onClick={() => loadDocuments("refresh")}
-            disabled={refreshing || loading}
-            className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
+            onClick={() => {
+              setShowFolderPanel((prev) => !prev);
+              setShowUploadPanel(false);
+            }}
+            className="rounded-md bg-[#4b0a06] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#5f0d08]"
           >
-            {refreshing ? "Refreshing..." : "Refresh"}
+            + Folder
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-              Document Type
-            </label>
-            <select
-              value={documentType}
-              onChange={(e) => setDocumentType(e.target.value)}
-              className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
-            >
-              {DOCUMENT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-              Folder
-            </label>
-            <select
-              value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
-              className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
-            >
-              <option value="">No Folder</option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-              Notes
-            </label>
-            <input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes"
-              className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
-            />
-          </div>
-
-          <div className="md:col-span-3">
-            <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
-              File
-            </label>
-
-            <div
-              onDragEnter={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setDragActive(true);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setDragActive(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setDragActive(false);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setDragActive(false);
-                handleFileSelect(e.dataTransfer.files?.[0] ?? null);
-              }}
-              className={`rounded-xl border-2 border-dashed p-6 text-center transition ${
-                dragActive
-                  ? "border-[#4b0a06] bg-[#fcf6f5]"
-                  : "border-[#d9d9d9] bg-[#fafafa]"
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
-              />
-
-              <p className="text-sm font-medium text-[#2b2b2b]">
-                Drag and drop a file here
-              </p>
-              <p className="mt-1 text-sm text-[#6b6b6b]">
-                or choose one manually
-              </p>
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-4 rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
-              >
-                Choose File
-              </button>
-
-              {file ? (
-                <div className="mt-4 rounded-md border border-[#e5e5e5] bg-white px-4 py-3 text-sm text-[#444444]">
-                  Selected: <span className="font-medium">{file.name}</span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        {error ? (
-          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="mt-5 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleUpload}
-            disabled={!file || uploading}
-            className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
-          >
-            {uploading ? "Uploading..." : "Upload Document"}
-          </button>
-
-          {file ? (
-            <button
-              type="button"
-              onClick={resetUploadForm}
-              className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
-            >
-              Clear
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-[#2b2b2b]">Folders</h2>
-            <p className="mt-1 text-sm text-[#6b6b6b]">
-              Organize and edit case documents.
-            </p>
-          </div>
-
-          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
+        {showFolderPanel ? (
+          <div className="mt-4 space-y-3 rounded-lg border border-[#e5e5e5] bg-[#fafafa] p-3">
             <input
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="New folder name"
-              className="rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
+              placeholder="Folder name"
+              className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
             />
-            <button
-              type="button"
-              onClick={handleCreateFolder}
-              disabled={!newFolderName.trim() || creatingFolder}
-              className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
-            >
-              {creatingFolder ? "Creating..." : "Create Folder"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleCreateFolder}
+                disabled={!newFolderName.trim() || creatingFolder}
+                className="rounded-md bg-[#4b0a06] px-3 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
+              >
+                {creatingFolder ? "Creating..." : "Create"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFolderPanel(false);
+                  setNewFolderName("");
+                }}
+                className="rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-4 space-y-1">
           <button
             type="button"
             onClick={() => setSelectedFolderFilter("all")}
-            className={`rounded-full border px-3 py-1.5 text-sm ${
+            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
               selectedFolderFilter === "all"
-                ? "border-[#4b0a06] bg-[#fdf6f5] text-[#4b0a06]"
-                : "border-[#d9d9d9] bg-white text-[#444444]"
+                ? "bg-[#fdf6f5] font-medium text-[#4b0a06]"
+                : "text-[#2b2b2b] hover:bg-[#f7f7f7]"
             }`}
           >
             All Documents
@@ -544,10 +396,10 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
           <button
             type="button"
             onClick={() => setSelectedFolderFilter("unfiled")}
-            className={`rounded-full border px-3 py-1.5 text-sm ${
+            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
               selectedFolderFilter === "unfiled"
-                ? "border-[#4b0a06] bg-[#fdf6f5] text-[#4b0a06]"
-                : "border-[#d9d9d9] bg-white text-[#444444]"
+                ? "bg-[#fdf6f5] font-medium text-[#4b0a06]"
+                : "text-[#2b2b2b] hover:bg-[#f7f7f7]"
             }`}
           >
             Unfiled
@@ -558,10 +410,10 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
               key={folder.id}
               type="button"
               onClick={() => setSelectedFolderFilter(folder.id)}
-              className={`rounded-full border px-3 py-1.5 text-sm ${
+              className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
                 selectedFolderFilter === folder.id
-                  ? "border-[#4b0a06] bg-[#fdf6f5] text-[#4b0a06]"
-                  : "border-[#d9d9d9] bg-white text-[#444444]"
+                  ? "bg-[#fdf6f5] font-medium text-[#4b0a06]"
+                  : "text-[#2b2b2b] hover:bg-[#f7f7f7]"
               }`}
             >
               {folder.name}
@@ -570,175 +422,334 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-[#2b2b2b]">Documents</h2>
-          {!loading && (
-            <span className="text-sm text-[#6b6b6b]">
-              {filteredDocuments.length} file{filteredDocuments.length === 1 ? "" : "s"}
-            </span>
+      <div className="col-span-9 space-y-6">
+        <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold text-[#2b2b2b]">Documents</h2>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => loadDocuments("refresh")}
+                disabled={refreshing || loading}
+                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUploadPanel((prev) => !prev);
+                  setShowFolderPanel(false);
+                }}
+                className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08]"
+              >
+                + Add Document
+              </button>
+            </div>
+          </div>
+
+          {showUploadPanel ? (
+            <div className="mt-5 rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
+                    Document Type
+                  </label>
+                  <select
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
+                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
+                  >
+                    {DOCUMENT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
+                    Folder
+                  </label>
+                  <select
+                    value={folderId}
+                    onChange={(e) => setFolderId(e.target.value)}
+                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
+                  >
+                    <option value="">No Folder</option>
+                    {folders.map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
+                    Notes
+                  </label>
+                  <input
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Optional notes"
+                    className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="md:col-span-3">
+                  <div
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragActive(true);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragActive(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragActive(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragActive(false);
+                      handleFileSelect(e.dataTransfer.files?.[0] ?? null);
+                    }}
+                    className={`rounded-xl border-2 border-dashed p-6 text-center transition ${
+                      dragActive
+                        ? "border-[#4b0a06] bg-[#fcf6f5]"
+                        : "border-[#d9d9d9] bg-white"
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+                    />
+
+                    <p className="text-sm font-medium text-[#2b2b2b]">
+                      Drag and drop a file here
+                    </p>
+                    <p className="mt-1 text-sm text-[#6b6b6b]">
+                      or choose one manually
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-4 rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+                    >
+                      Choose File
+                    </button>
+
+                    {file ? (
+                      <div className="mt-4 rounded-md border border-[#e5e5e5] bg-white px-4 py-3 text-sm text-[#444444]">
+                        Selected: <span className="font-medium">{file.name}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleUpload}
+                  disabled={!file || uploading}
+                  className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
+                >
+                  {uploading ? "Uploading..." : "Upload Document"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetUploadForm();
+                    setShowUploadPanel(false);
+                  }}
+                  className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {error ? (
+            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          ) : null}
+
+          {loading ? (
+            <p className="mt-4 text-sm text-[#6b6b6b]">Loading case documents...</p>
+          ) : filteredDocuments.length === 0 ? (
+            <p className="mt-4 text-sm text-[#6b6b6b]">
+              No documents found for this folder.
+            </p>
+          ) : (
+            <div className="mt-5 overflow-hidden rounded-lg border border-[#e5e5e5]">
+              <table className="min-w-full text-sm">
+                <thead className="border-b border-[#e5e5e5] bg-[#fafafa] text-left text-[#2b2b2b]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">File</th>
+                    <th className="px-4 py-3 font-semibold">Type</th>
+                    <th className="px-4 py-3 font-semibold">Folder</th>
+                    <th className="px-4 py-3 font-semibold">Size</th>
+                    <th className="px-4 py-3 font-semibold">Uploaded</th>
+                    <th className="px-4 py-3 font-semibold">Notes</th>
+                    <th className="px-4 py-3 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDocuments.map((doc) => {
+                    const isEditing = editingDocumentId === doc.id;
+
+                    return (
+                      <tr
+                        key={doc.id}
+                        className="border-b border-[#eeeeee] last:border-b-0"
+                      >
+                        <td className="px-4 py-3 text-[#2b2b2b]">
+                          {doc.original_filename}
+                        </td>
+
+                        <td className="px-4 py-3 text-[#555555]">
+                          {isEditing ? (
+                            <select
+                              value={editDocumentType}
+                              onChange={(e) => setEditDocumentType(e.target.value)}
+                              className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
+                            >
+                              {DOCUMENT_TYPES.map((type) => (
+                                <option key={type} value={type}>
+                                  {type}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            doc.document_type
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3 text-[#555555]">
+                          {isEditing ? (
+                            <select
+                              value={editFolderId}
+                              onChange={(e) => setEditFolderId(e.target.value)}
+                              className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
+                            >
+                              <option value="">No Folder</option>
+                              {folders.map((folder) => (
+                                <option key={folder.id} value={folder.id}>
+                                  {folder.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : doc.folder_id ? (
+                            folderNameById.get(doc.folder_id) || "—"
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3 text-[#555555]">
+                          {formatFileSize(doc.size_bytes)}
+                        </td>
+
+                        <td className="px-4 py-3 text-[#555555]">
+                          {formatDate(doc.created_at)}
+                        </td>
+
+                        <td className="px-4 py-3 text-[#555555]">
+                          {isEditing ? (
+                            <input
+                              value={editNotes}
+                              onChange={(e) => setEditNotes(e.target.value)}
+                              className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
+                              placeholder="Optional notes"
+                            />
+                          ) : (
+                            doc.notes || "—"
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-2">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveDocument(doc.id)}
+                                  disabled={savingDocumentId === doc.id}
+                                  className="rounded-md bg-[#4b0a06] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
+                                >
+                                  {savingDocumentId === doc.id ? "Saving..." : "Save"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={cancelEditingDocument}
+                                  className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePreview(doc.id)}
+                                  className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+                                >
+                                  Preview
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownload(doc.id)}
+                                  className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+                                >
+                                  Download
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => startEditingDocument(doc)}
+                                  className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+                                >
+                                  Edit
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDocument(doc.id)}
+                                  disabled={deletingDocumentId === doc.id}
+                                  className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  {deletingDocumentId === doc.id ? "Deleting..." : "Delete"}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
-
-        {loading ? (
-          <p className="mt-4 text-sm text-[#6b6b6b]">Loading case documents...</p>
-        ) : filteredDocuments.length === 0 ? (
-          <p className="mt-4 text-sm text-[#6b6b6b]">
-            No documents found for this folder.
-          </p>
-        ) : (
-          <div className="mt-5 overflow-hidden rounded-lg border border-[#e5e5e5]">
-            <table className="min-w-full text-sm">
-              <thead className="border-b border-[#e5e5e5] bg-[#fafafa] text-left text-[#2b2b2b]">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">File</th>
-                  <th className="px-4 py-3 font-semibold">Type</th>
-                  <th className="px-4 py-3 font-semibold">Folder</th>
-                  <th className="px-4 py-3 font-semibold">Size</th>
-                  <th className="px-4 py-3 font-semibold">Uploaded</th>
-                  <th className="px-4 py-3 font-semibold">Notes</th>
-                  <th className="px-4 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDocuments.map((doc) => {
-                  const isEditing = editingDocumentId === doc.id;
-
-                  return (
-                    <tr
-                      key={doc.id}
-                      className="border-b border-[#eeeeee] last:border-b-0"
-                    >
-                      <td className="px-4 py-3 text-[#2b2b2b]">
-                        {doc.original_filename}
-                      </td>
-
-                      <td className="px-4 py-3 text-[#555555]">
-                        {isEditing ? (
-                          <select
-                            value={editDocumentType}
-                            onChange={(e) => setEditDocumentType(e.target.value)}
-                            className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
-                          >
-                            {DOCUMENT_TYPES.map((type) => (
-                              <option key={type} value={type}>
-                                {type}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          doc.document_type
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 text-[#555555]">
-                        {isEditing ? (
-                          <select
-                            value={editFolderId}
-                            onChange={(e) => setEditFolderId(e.target.value)}
-                            className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
-                          >
-                            <option value="">No Folder</option>
-                            {folders.map((folder) => (
-                              <option key={folder.id} value={folder.id}>
-                                {folder.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : doc.folder_id ? (
-                          folderNameById.get(doc.folder_id) || "—"
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 text-[#555555]">
-                        {formatFileSize(doc.size_bytes)}
-                      </td>
-
-                      <td className="px-4 py-3 text-[#555555]">
-                        {formatDate(doc.created_at)}
-                      </td>
-
-                      <td className="px-4 py-3 text-[#555555]">
-                        {isEditing ? (
-                          <input
-                            value={editNotes}
-                            onChange={(e) => setEditNotes(e.target.value)}
-                            className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
-                            placeholder="Optional notes"
-                          />
-                        ) : (
-                          doc.notes || "—"
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          {isEditing ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleSaveDocument(doc.id)}
-                                disabled={savingDocumentId === doc.id}
-                                className="rounded-md bg-[#4b0a06] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
-                              >
-                                {savingDocumentId === doc.id ? "Saving..." : "Save"}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={cancelEditingDocument}
-                                className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handlePreview(doc.id)}
-                                className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
-                              >
-                                Preview
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleDownload(doc.id)}
-                                className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
-                              >
-                                Download
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => startEditingDocument(doc)}
-                                className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
-                              >
-                                Edit
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteDocument(doc.id)}
-                                disabled={deletingDocumentId === doc.id}
-                                className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-                              >
-                                {deletingDocumentId === doc.id ? "Deleting..." : "Delete"}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );
