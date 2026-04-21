@@ -21,7 +21,7 @@ type DocumentFolder = {
 };
 
 type Props = {
-  caseNumber: string;
+  caseId: string;
 };
 
 const DOCUMENT_TYPES = [
@@ -116,7 +116,7 @@ async function parseJsonResponse(res: Response): Promise<Record<string, unknown>
   return data;
 }
 
-export default function CaseDocumentsTab({ caseNumber }: Props) {
+export default function CaseDocumentsTab({ caseId }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [documents, setDocuments] = useState<CaseDocument[]>([]);
@@ -159,8 +159,8 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
 
       try {
         const [docsRes, foldersRes] = await Promise.all([
-          fetch(`/api/cases/${caseNumber}/documents`, { cache: "no-store" }),
-          fetch(`/api/cases/${caseNumber}/folders`, { cache: "no-store" }),
+          fetch(`/api/cases/${caseId}/documents`, { cache: "no-store" }),
+          fetch(`/api/cases/${caseId}/folders`, { cache: "no-store" }),
         ]);
 
         const docsData = await parseJsonResponse(docsRes);
@@ -178,7 +178,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
         }
       }
     },
-    [caseNumber]
+    [caseId]
   );
 
   useEffect(() => {
@@ -216,7 +216,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
       formData.append("notes", notes);
       if (folderId) formData.append("folder_id", folderId);
 
-      const res = await fetch(`/api/cases/${caseNumber}/documents`, {
+      const res = await fetch(`/api/cases/${caseId}/documents`, {
         method: "POST",
         body: formData,
       });
@@ -241,7 +241,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/cases/${caseNumber}/folders`, {
+      const res = await fetch(`/api/cases/${caseId}/folders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -267,7 +267,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   async function handleDownload(documentId: string) {
     try {
       const res = await fetch(
-        `/api/cases/${caseNumber}/documents/${documentId}/download`
+        `/api/cases/${caseId}/documents/${documentId}/download`
       );
       const data = await parseJsonResponse(res);
       const url = getString(data.url);
@@ -283,7 +283,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   async function handlePreview(documentId: string) {
     try {
       const res = await fetch(
-        `/api/cases/${caseNumber}/documents/${documentId}/download`
+        `/api/cases/${caseId}/documents/${documentId}/preview`
       );
       const data = await parseJsonResponse(res);
       const url = getString(data.url);
@@ -316,7 +316,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
 
     try {
       const res = await fetch(
-        `/api/cases/${caseNumber}/documents/${documentId}`,
+        `/api/cases/${caseId}/documents/${documentId}`,
         {
           method: "PATCH",
           headers: {
@@ -352,7 +352,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
 
     try {
       const res = await fetch(
-        `/api/cases/${caseNumber}/documents/${documentId}`,
+        `/api/cases/${caseId}/documents/${documentId}`,
         {
           method: "DELETE",
         }

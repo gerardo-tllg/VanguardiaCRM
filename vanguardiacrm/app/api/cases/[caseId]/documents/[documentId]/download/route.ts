@@ -1,18 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type RouteContext = {
   params: Promise<{ caseId: string; documentId: string }>;
 };
 
-export async function GET(_req: Request, context: RouteContext) {
+function encodeFilename(name: string) {
+  return encodeURIComponent(name)
+    .replace(/['()]/g, escape)
+    .replace(/\*/g, "%2A");
+}
+
+export async function GET(_req: NextRequest, context: RouteContext) {
   try {
     const { caseId, documentId } = await context.params;
 
+    // ✅ FIX: use id instead of case_number
     const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
-      .select("id, case_number")
-      .eq("case_number", caseId)
+      .select("id")
+      .eq("id", caseId)
       .single();
 
     if (caseError || !caseRecord) {
@@ -21,7 +28,7 @@ export async function GET(_req: Request, context: RouteContext) {
 
     const { data: doc, error: docError } = await supabaseAdmin
       .from("case_documents")
-      .select("id, case_id, original_filename, storage_path")
+      .select("original_filename, storage_path, mime_type")
       .eq("id", documentId)
       .eq("case_id", caseRecord.id)
       .single();
@@ -32,36 +39,36 @@ export async function GET(_req: Request, context: RouteContext) {
 
     if (!doc.storage_path) {
       return NextResponse.json(
-        { error: "Document has no storage path" },
+        { error: "Missing storage path" },
         { status: 400 }
       );
     }
 
-    const { data: signed, error: signedUrlError } = await supabaseAdmin.storage
-      .from("case-documents")
-      .createSignedUrl(doc.storage_path, 60 * 5);
+    const { data: fileData, error: downloadError } =
+      await supabaseAdmin.storage
+        .from("case-documents")
+        .download(doc.storage_path);
 
-    if (signedUrlError || !signed?.signedUrl) {
+    if (downloadError || !fileData) {
       return NextResponse.json(
-        { error: signedUrlError?.message || "Failed to create signed URL" },
+        { error: downloadError?.message || "Download failed" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        url: signed.signedUrl,
-        filename: doc.original_filename,
+    const buffer = await fileData.arrayBuffer();
+    const filename = doc.original_filename || "document";
+    const encoded = encodeFilename(filename);
+
+    return new NextResponse(buffer, {
+      headers: {
+        "Content-Type": doc.mime_type || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encoded}`,
       },
-      { status: 200 }
-    );
-  } catch (error) {
+    });
+  } catch (err) {
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Failed to generate download URL",
-      },
+      { error: err instanceof Error ? err.message : "Server error" },
       { status: 500 }
     );
   }
