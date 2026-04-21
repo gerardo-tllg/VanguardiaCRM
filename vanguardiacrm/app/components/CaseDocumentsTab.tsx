@@ -1,7 +1,6 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type CaseDocument = {
   id: string;
@@ -33,37 +32,54 @@ function formatDate(value: string) {
 }
 
 export default function CaseDocumentsTab({ caseNumber }: Props) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [documents, setDocuments] = useState<CaseDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [category, setCategory] = useState("general");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadDocuments() {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch(`/api/cases/${caseNumber}/documents`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to load documents");
+  const loadDocuments = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
       }
 
-      setDocuments(data.documents ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load documents");
-    } finally {
-      setLoading(false);
-    }
-  }
+      setError(null);
+
+      try {
+        const res = await fetch(`/api/cases/${caseNumber}/documents`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to load documents");
+        }
+
+        setDocuments(data.documents ?? []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load documents");
+      } finally {
+        if (mode === "initial") {
+          setLoading(false);
+        } else {
+          setRefreshing(false);
+        }
+      }
+    },
+    [caseNumber]
+  );
 
   useEffect(() => {
-    loadDocuments();
-  }, [caseNumber, loadDocuments]);
+    loadDocuments("initial");
+  }, [loadDocuments]);
 
   async function handleUpload() {
     if (!file) return;
@@ -92,12 +108,11 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
       setNotes("");
       setCategory("general");
 
-      const fileInput = document.getElementById(
-        "case-document-upload"
-      ) as HTMLInputElement | null;
-      if (fileInput) fileInput.value = "";
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
-      await loadDocuments();
+      await loadDocuments("refresh");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -117,7 +132,7 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
       }
 
       if (data.url) {
-        window.open(data.url, "_blank");
+        window.open(data.url, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
@@ -127,7 +142,18 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-        <h2 className="text-lg font-semibold text-[#2b2b2b]">Upload Document</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold text-[#2b2b2b]">Upload Document</h2>
+
+          <button
+            type="button"
+            onClick={() => loadDocuments("refresh")}
+            disabled={refreshing || loading}
+            className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:opacity-50"
+          >
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
 
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-1">
@@ -166,11 +192,16 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
               File
             </label>
             <input
-              id="case-document-upload"
+              ref={fileInputRef}
               type="file"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="w-full rounded-md border border-[#d9d9d9] px-4 py-2 text-sm"
             />
+            {file ? (
+              <p className="mt-2 text-sm text-[#6b6b6b]">
+                Selected: {file.name}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -193,10 +224,17 @@ export default function CaseDocumentsTab({ caseNumber }: Props) {
       </div>
 
       <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-        <h2 className="text-lg font-semibold text-[#2b2b2b]">Documents</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold text-[#2b2b2b]">Documents</h2>
+          {!loading && documents.length > 0 ? (
+            <span className="text-sm text-[#6b6b6b]">
+              {documents.length} file{documents.length === 1 ? "" : "s"}
+            </span>
+          ) : null}
+        </div>
 
         {loading ? (
-          <p className="mt-4 text-sm text-[#6b6b6b]">Loading documents...</p>
+          <p className="mt-4 text-sm text-[#6b6b6b]">Loading case documents...</p>
         ) : documents.length === 0 ? (
           <p className="mt-4 text-sm text-[#6b6b6b]">No documents uploaded yet.</p>
         ) : (
