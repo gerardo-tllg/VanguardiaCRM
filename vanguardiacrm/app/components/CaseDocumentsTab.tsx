@@ -558,11 +558,11 @@ export default function CaseDocumentsTab({ caseId }: Props) {
         : [];
 
     const filteredDocuments =
-      selectedFolderFilter === "all"
-        ? documents
-        : selectedFolderFilter === "unfiled"
-        ? documents.filter((doc) => !doc.folder_id)
-        : documents.filter((doc) => doc.folder_id === selectedFolderFilter);
+  selectedFolderFilter === "all"
+    ? documents.filter((doc) => !doc.folder_id)
+    : selectedFolderFilter === "unfiled"
+    ? documents.filter((doc) => !doc.folder_id)
+    : documents.filter((doc) => doc.folder_id === selectedFolderFilter);
 
     const documentRows: GridRow[] = filteredDocuments.map((document) => ({
       kind: "document",
