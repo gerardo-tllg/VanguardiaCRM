@@ -158,6 +158,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [bulkMoving, setBulkMoving] = useState(false);
 
   const [showUploadPanel, setShowUploadPanel] = useState(false);
   const [showFolderPanel, setShowFolderPanel] = useState(false);
@@ -173,6 +174,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
   const [selectedFolderFilter, setSelectedFolderFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
+  const [moveTargetFolderId, setMoveTargetFolderId] = useState<string>("");
 
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
   const [editDocumentType, setEditDocumentType] = useState("general");
@@ -373,6 +375,24 @@ export default function CaseDocumentsTab({ caseId }: Props) {
     setEditFolderId("");
   }
 
+  async function patchDocumentFolder(documentId: string, nextFolderId: string | null) {
+    const res = await fetch(`/api/cases/${caseId}/documents/${documentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder_id: nextFolderId }),
+    });
+
+    await parseJsonResponse(res);
+  }
+
+  async function deleteFolder(folderId: string) {
+    const res = await fetch(`/api/cases/${caseId}/folders/${folderId}`, {
+      method: "DELETE",
+    });
+
+    await parseJsonResponse(res);
+  }
+
   async function handleSaveDocument(documentId: string) {
     setSavingDocumentId(documentId);
     setError(null);
@@ -447,10 +467,11 @@ export default function CaseDocumentsTab({ caseId }: Props) {
   }
 
   async function handleBulkDelete() {
-    if (selectedIds.length === 0) return;
+    const totalSelected = selectedIds.length + selectedFolderIds.length;
+    if (totalSelected === 0) return;
 
     const confirmed = window.confirm(
-      `Delete ${selectedIds.length} selected document${selectedIds.length === 1 ? "" : "s"}?`
+      `Delete ${totalSelected} selected item${totalSelected === 1 ? "" : "s"}? Selected folders will be deleted and any files inside them will be unfiled.`
     );
     if (!confirmed) return;
 
@@ -462,16 +483,53 @@ export default function CaseDocumentsTab({ caseId }: Props) {
         await deleteDocument(id);
       }
 
+      for (const folderId of selectedFolderIds) {
+        await deleteFolder(folderId);
+      }
+
       if (editingDocumentId && selectedIds.includes(editingDocumentId)) {
         cancelEditingDocument();
       }
 
+      if (selectedFolderIds.includes(selectedFolderFilter)) {
+        setSelectedFolderFilter("all");
+      }
+
       setSelectedIds([]);
+      setSelectedFolderIds([]);
+      setMoveTargetFolderId("");
       await loadDocuments("refresh");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk delete failed");
     } finally {
       setBulkDeleting(false);
+    }
+  }
+
+  async function handleBulkMove() {
+    if (selectedIds.length === 0 || !moveTargetFolderId) return;
+
+    setBulkMoving(true);
+    setError(null);
+
+    try {
+      const nextFolderId = moveTargetFolderId === "__UNFILED__" ? null : moveTargetFolderId;
+
+      for (const documentId of selectedIds) {
+        await patchDocumentFolder(documentId, nextFolderId);
+      }
+
+      if (editingDocumentId && selectedIds.includes(editingDocumentId)) {
+        cancelEditingDocument();
+      }
+
+      setSelectedIds([]);
+      setMoveTargetFolderId("");
+      await loadDocuments("refresh");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk move failed");
+    } finally {
+      setBulkMoving(false);
     }
   }
 
@@ -510,17 +568,25 @@ export default function CaseDocumentsTab({ caseId }: Props) {
     [rows]
   );
 
+  const allVisibleFolderIds = useMemo(
+    () => rows.filter((row) => row.kind === "folder").map((row) => row.id),
+    [rows]
+  );
+
   const allSelected =
-    allVisibleDocumentIds.length > 0 &&
-    allVisibleDocumentIds.every((id) => selectedIds.includes(id));
+    allVisibleDocumentIds.length + allVisibleFolderIds.length > 0 &&
+    allVisibleDocumentIds.every((id) => selectedIds.includes(id)) &&
+    allVisibleFolderIds.every((id) => selectedFolderIds.includes(id));
 
   function toggleSelectAll() {
     if (allSelected) {
       setSelectedIds((current) => current.filter((id) => !allVisibleDocumentIds.includes(id)));
+      setSelectedFolderIds((current) => current.filter((id) => !allVisibleFolderIds.includes(id)));
       return;
     }
 
     setSelectedIds((current) => Array.from(new Set([...current, ...allVisibleDocumentIds])));
+    setSelectedFolderIds((current) => Array.from(new Set([...current, ...allVisibleFolderIds])));
   }
 
   function toggleSelect(id: string) {
@@ -616,17 +682,41 @@ export default function CaseDocumentsTab({ caseId }: Props) {
           ))}
         </div>
 
-        {selectedIds.length > 0 ? (
+        {selectedIds.length > 0 || selectedFolderIds.length > 0 ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#ead8d3] bg-[#faf4f2] px-4 py-3">
             <div className="text-sm font-medium text-[#4a2b24]">
-              {selectedIds.length} selected
+              {selectedIds.length + selectedFolderIds.length} selected
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <select
+                value={moveTargetFolderId}
+                onChange={(e) => setMoveTargetFolderId(e.target.value)}
+                disabled={selectedIds.length === 0 || bulkMoving || bulkDeleting || bulkDownloading}
+                className="rounded-md border border-[#d1d1d1] bg-white px-3 py-1.5 text-sm text-[#333333] disabled:opacity-50"
+              >
+                <option value="">Move to folder...</option>
+                <option value="__UNFILED__">Remove from folder</option>
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {formatFolderName(folder.name)}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleBulkMove}
+                disabled={!moveTargetFolderId || selectedIds.length === 0 || bulkMoving || bulkDeleting || bulkDownloading}
+                className="rounded-md border border-[#d1d1d1] bg-white px-3 py-1.5 text-sm font-medium text-[#333333] hover:bg-[#f7f7f7] disabled:opacity-50"
+              >
+                {bulkMoving ? "Moving..." : "Move Selected"}
+              </button>
+
               <button
                 type="button"
                 onClick={handleBulkDownload}
-                disabled={bulkDownloading || bulkDeleting}
+                disabled={selectedIds.length === 0 || bulkDownloading || bulkDeleting || bulkMoving}
                 className="rounded-md border border-[#d1d1d1] bg-white px-3 py-1.5 text-sm font-medium text-[#333333] hover:bg-[#f7f7f7] disabled:opacity-50"
               >
                 {bulkDownloading ? "Downloading..." : "Download Selected"}
@@ -635,7 +725,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
               <button
                 type="button"
                 onClick={handleBulkDelete}
-                disabled={bulkDeleting || bulkDownloading}
+                disabled={bulkDeleting || bulkDownloading || bulkMoving}
                 className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
               >
                 {bulkDeleting ? "Deleting..." : "Delete Selected"}
@@ -643,7 +733,11 @@ export default function CaseDocumentsTab({ caseId }: Props) {
 
               <button
                 type="button"
-                onClick={() => setSelectedIds([])}
+                onClick={() => {
+                  setSelectedIds([]);
+                  setSelectedFolderIds([]);
+                  setMoveTargetFolderId("");
+                }}
                 className="rounded-md border border-[#d1d1d1] bg-white px-3 py-1.5 text-sm font-medium text-[#333333] hover:bg-[#f7f7f7]"
               >
                 Clear
