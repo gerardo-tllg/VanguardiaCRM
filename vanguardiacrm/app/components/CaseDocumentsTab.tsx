@@ -984,14 +984,18 @@ export default function CaseDocumentsTab({ caseId }: Props) {
                         />
                       </td>
 
-                      <td className="px-4 py-5 align-middle text-[#2f2f2f]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[18px]">📁</span>
-                          <span className="font-medium underline underline-offset-2">
-                            {formatFolderName(row.folder.name)}
-                          </span>
-                        </div>
-                      </td>
+                     <td className="px-4 py-5 align-middle text-[#2f2f2f]">
+  <div className="flex items-center gap-2">
+    <span className="text-[18px]">📁</span>
+    <button
+      type="button"
+      onClick={() => setSelectedFolderFilter(row.folder.id)}
+      className="font-medium underline underline-offset-2 hover:text-[#650d02]"
+    >
+      {formatFolderName(row.folder.name)}
+    </button>
+  </div>
+</td>
 
                       <td className="px-4 py-5 text-[#666666]">—</td>
                       <td className="px-4 py-5 text-[#666666]">—</td>
