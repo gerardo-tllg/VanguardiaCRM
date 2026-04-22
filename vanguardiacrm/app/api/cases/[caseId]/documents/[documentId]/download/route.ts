@@ -15,11 +15,21 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   try {
     const { caseId, documentId } = await context.params;
 
+    const { data: caseRecord, error: caseError } = await supabaseAdmin
+      .from("cases")
+      .select("id, case_number")
+      .eq("case_number", caseId)
+      .single();
+
+    if (caseError || !caseRecord) {
+      return NextResponse.json({ error: "Case not found" }, { status: 404 });
+    }
+
     const { data: doc, error: docError } = await supabaseAdmin
       .from("case_documents")
       .select("id, case_id, original_filename, storage_path, mime_type")
       .eq("id", documentId)
-      .eq("case_id", caseId)
+      .eq("case_id", caseRecord.id)
       .single();
 
     if (docError || !doc) {

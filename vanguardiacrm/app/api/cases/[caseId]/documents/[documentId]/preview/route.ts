@@ -9,45 +9,31 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   try {
     const { caseId, documentId } = await context.params;
 
-    const { data: docById, error: docByIdError } = await supabaseAdmin
+    const { data: caseRecord, error: caseError } = await supabaseAdmin
+      .from("cases")
+      .select("id, case_number")
+      .eq("case_number", caseId)
+      .single();
+
+    if (caseError || !caseRecord) {
+      return NextResponse.json({ error: "Case not found" }, { status: 404 });
+    }
+
+    const { data: doc, error: docError } = await supabaseAdmin
       .from("case_documents")
       .select("id, case_id, storage_path, original_filename")
       .eq("id", documentId)
-      .maybeSingle();
+      .eq("case_id", caseRecord.id)
+      .single();
 
-    if (docByIdError) {
+    if (docError || !doc) {
       return NextResponse.json(
-        { error: docByIdError.message },
-        { status: 500 }
-      );
-    }
-
-    if (!docById) {
-      return NextResponse.json(
-        {
-          error: "Document not found by id",
-          debug: { caseId, documentId },
-        },
+        { error: "Document not found for this case" },
         { status: 404 }
       );
     }
 
-    if (docById.case_id !== caseId) {
-      return NextResponse.json(
-        {
-          error: "Document exists, but caseId does not match",
-          debug: {
-            routeCaseId: caseId,
-            documentId,
-            actualDocumentCaseId: docById.case_id,
-            filename: docById.original_filename,
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!docById.storage_path) {
+    if (!doc.storage_path) {
       return NextResponse.json(
         { error: "Document is missing a storage path" },
         { status: 400 }
@@ -56,7 +42,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
     const { data: signedData, error: signedError } = await supabaseAdmin.storage
       .from("case-documents")
-      .createSignedUrl(docById.storage_path, 60 * 5);
+      .createSignedUrl(doc.storage_path, 60 * 5);
 
     if (signedError || !signedData?.signedUrl) {
       return NextResponse.json(
@@ -65,11 +51,14 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      url: signedData.signedUrl,
-      filename: docById.original_filename ?? null,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        url: signedData.signedUrl,
+        filename: doc.original_filename ?? null,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     return NextResponse.json(
       {
