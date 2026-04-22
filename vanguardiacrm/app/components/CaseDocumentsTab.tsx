@@ -29,16 +29,12 @@ type GridRow =
       kind: "folder";
       id: string;
       name: string;
-      uploadedBy: string | null;
-      uploadedDate: string | null;
       folder: DocumentFolder;
     }
   | {
       kind: "document";
       id: string;
       name: string;
-      uploadedBy: string | null;
-      uploadedDate: string;
       document: CaseDocument;
     };
 
@@ -113,6 +109,13 @@ function formatFolderName(name: string) {
   return name.replace(/[-_]/g, " ");
 }
 
+function formatFileSize(size: number | null) {
+  if (!size) return "—";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 async function parseJsonResponse(res: Response): Promise<Record<string, unknown>> {
   const text = await res.text();
   let data: unknown = {};
@@ -153,6 +156,8 @@ export default function CaseDocumentsTab({ caseId }: Props) {
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [previewingDocumentId, setPreviewingDocumentId] = useState<string | null>(null);
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
 
   const [showUploadPanel, setShowUploadPanel] = useState(false);
   const [showFolderPanel, setShowFolderPanel] = useState(false);
@@ -204,6 +209,10 @@ export default function CaseDocumentsTab({ caseId }: Props) {
   useEffect(() => {
     void loadDocuments("initial");
   }, [loadDocuments]);
+
+  useEffect(() => {
+    setSelectedIds((current) => current.filter((id) => documents.some((doc) => doc.id == id)));
+  }, [documents]);
 
   function resetUploadForm() {
     setFile(null);
@@ -310,34 +319,38 @@ export default function CaseDocumentsTab({ caseId }: Props) {
     document.body.removeChild(link);
   }
 
+  async function downloadDocument(documentId: string) {
+    const res = await fetch(`/api/cases/${caseId}/documents/${documentId}/download`, {
+      cache: "no-store",
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      const data = await parseJsonResponse(res);
+      throw new Error(getString(data.error) || "Download failed");
+    }
+
+    if (!res.ok) {
+      throw new Error(`Download failed (${res.status})`);
+    }
+
+    const blob = await res.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    const disposition = res.headers.get("content-disposition") || "";
+    const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
+    const filename = decodeURIComponent((match?.[1] || match?.[2] || "document").trim());
+
+    triggerBrowserDownload(objectUrl, filename);
+    window.URL.revokeObjectURL(objectUrl);
+  }
+
   async function handleDownload(documentId: string) {
     setDownloadingDocumentId(documentId);
     setError(null);
 
     try {
-      const res = await fetch(`/api/cases/${caseId}/documents/${documentId}/download`, {
-        cache: "no-store",
-      });
-
-      const contentType = res.headers.get("content-type") || "";
-
-      if (contentType.includes("application/json")) {
-        const data = await parseJsonResponse(res);
-        throw new Error(getString(data.error) || "Download failed");
-      }
-
-      if (!res.ok) {
-        throw new Error(`Download failed (${res.status})`);
-      }
-
-      const blob = await res.blob();
-      const objectUrl = window.URL.createObjectURL(blob);
-      const disposition = res.headers.get("content-disposition") || "";
-      const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
-      const filename = decodeURIComponent((match?.[1] || match?.[2] || "document").trim());
-
-      triggerBrowserDownload(objectUrl, filename);
-      window.URL.revokeObjectURL(objectUrl);
+      await downloadDocument(documentId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
     } finally {
@@ -345,6 +358,12 @@ export default function CaseDocumentsTab({ caseId }: Props) {
     }
   }
 
+  function startEditingDocument(doc: CaseDocument) {
+    setEditingDocumentId(doc.id);
+    setEditDocumentType(doc.document_type || "general");
+    setEditNotes(doc.notes || "");
+    setEditFolderId(doc.folder_id || "");
+  }
 
   function cancelEditingDocument() {
     setEditingDocumentId(null);
@@ -378,6 +397,14 @@ export default function CaseDocumentsTab({ caseId }: Props) {
     }
   }
 
+  async function deleteDocument(documentId: string) {
+    const res = await fetch(`/api/cases/${caseId}/documents/${documentId}`, {
+      method: "DELETE",
+    });
+
+    await parseJsonResponse(res);
+  }
+
   async function handleDeleteDocument(documentId: string) {
     const confirmed = window.confirm("Delete this document? This will remove the file from the case.");
     if (!confirmed) return;
@@ -386,21 +413,64 @@ export default function CaseDocumentsTab({ caseId }: Props) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/cases/${caseId}/documents/${documentId}`, {
-        method: "DELETE",
-      });
-
-      await parseJsonResponse(res);
+      await deleteDocument(documentId);
 
       if (editingDocumentId === documentId) {
         cancelEditingDocument();
       }
 
+      setSelectedIds((current) => current.filter((id) => id !== documentId));
       await loadDocuments("refresh");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete document");
     } finally {
       setDeletingDocumentId(null);
+    }
+  }
+
+  async function handleBulkDownload() {
+    if (selectedIds.length === 0) return;
+
+    setBulkDownloading(true);
+    setError(null);
+
+    try {
+      for (const id of selectedIds) {
+        await downloadDocument(id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk download failed");
+    } finally {
+      setBulkDownloading(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Delete ${selectedIds.length} selected document${selectedIds.length === 1 ? "" : "s"}?`
+    );
+    if (!confirmed) return;
+
+    setBulkDeleting(true);
+    setError(null);
+
+    try {
+      for (const id of selectedIds) {
+        await deleteDocument(id);
+      }
+
+      if (editingDocumentId && selectedIds.includes(editingDocumentId)) {
+        cancelEditingDocument();
+      }
+
+      setSelectedIds([]);
+      await loadDocuments("refresh");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk delete failed");
+    } finally {
+      setBulkDeleting(false);
     }
   }
 
@@ -413,8 +483,6 @@ export default function CaseDocumentsTab({ caseId }: Props) {
               kind: "folder",
               id: folder.id,
               name: folder.name,
-              uploadedBy: null,
-              uploadedDate: null,
               folder,
             }))
         : [];
@@ -430,8 +498,6 @@ export default function CaseDocumentsTab({ caseId }: Props) {
       kind: "document",
       id: document.id,
       name: document.original_filename,
-      uploadedBy: document.uploaded_by,
-      uploadedDate: document.created_at,
       document,
     }));
 
@@ -463,7 +529,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-[#dadada] bg-white shadow-sm">
+    <div className="w-full rounded-xl border border-[#dadada] bg-white shadow-sm">
       <div className="border-b border-[#e9e9e9] px-4 py-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[24px] font-semibold text-[#2f2f2f]">Documents</h2>
@@ -542,6 +608,42 @@ export default function CaseDocumentsTab({ caseId }: Props) {
             </button>
           ))}
         </div>
+
+        {selectedIds.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#ead8d3] bg-[#faf4f2] px-4 py-3">
+            <div className="text-sm font-medium text-[#4a2b24]">
+              {selectedIds.length} selected
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleBulkDownload}
+                disabled={bulkDownloading || bulkDeleting}
+                className="rounded-md border border-[#d1d1d1] bg-white px-3 py-1.5 text-sm font-medium text-[#333333] hover:bg-[#f7f7f7] disabled:opacity-50"
+              >
+                {bulkDownloading ? "Downloading..." : "Download Selected"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting || bulkDownloading}
+                className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                {bulkDeleting ? "Deleting..." : "Delete Selected"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="rounded-md border border-[#d1d1d1] bg-white px-3 py-1.5 text-sm font-medium text-[#333333] hover:bg-[#f7f7f7]"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {showFolderPanel ? (
@@ -579,7 +681,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
 
       {showUploadPanel ? (
         <div className="border-b border-[#e9e9e9] bg-[#fafafa] px-4 py-5 sm:px-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
             <div>
               <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
                 Document Type
@@ -615,7 +717,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
               </select>
             </div>
 
-            <div>
+            <div className="xl:col-span-2">
               <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
                 Notes
               </label>
@@ -627,7 +729,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
               />
             </div>
 
-            <div className="md:col-span-3">
+            <div className="xl:col-span-4">
               <div
                 onDragEnter={(e) => {
                   e.preventDefault();
@@ -719,8 +821,8 @@ export default function CaseDocumentsTab({ caseId }: Props) {
         </div>
       ) : null}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[980px] text-sm">
           <thead className="bg-[#efefef] text-left text-[#4a4a4a]">
             <tr>
               <th className="w-12 px-4 py-4">
@@ -731,13 +833,13 @@ export default function CaseDocumentsTab({ caseId }: Props) {
                   className="h-4 w-4 rounded border-[#cfcfcf]"
                 />
               </th>
-              <th className="min-w-82.5 px-4 py-4 font-semibold">File Name</th>
-              <th className="min-w-35 px-4 py-4 font-semibold">Reviewed By</th>
-              <th className="min-w-45 px-4 py-4 font-semibold">Uploaded By</th>
-              <th className="min-w-30 px-4 py-4 font-semibold">Doc ID</th>
-              <th className="min-w-45 px-4 py-4 font-semibold">Uploaded Date</th>
-              <th className="min-w-45 px-4 py-4 font-semibold">Last Modified Date</th>
-              <th className="w-14 px-4 py-4"></th>
+              <th className="w-[34%] px-4 py-4 font-semibold">File Name</th>
+              <th className="w-[12%] px-4 py-4 font-semibold">Reviewed By</th>
+              <th className="w-[15%] px-4 py-4 font-semibold">Uploaded By</th>
+              <th className="w-[10%] px-4 py-4 font-semibold">Doc ID</th>
+              <th className="w-[14%] px-4 py-4 font-semibold">Uploaded Date</th>
+              <th className="w-[14%] px-4 py-4 font-semibold">Last Modified Date</th>
+              <th className="w-[1%] px-4 py-4"></th>
             </tr>
           </thead>
 
@@ -781,8 +883,8 @@ export default function CaseDocumentsTab({ caseId }: Props) {
                       <td className="px-4 py-5 text-[#666666]">—</td>
                       <td className="px-4 py-5 text-[#666666]">—</td>
                       <td className="px-4 py-5 text-[#666666]">—</td>
-                      <td className="px-4 py-5 text-[#666666]">{formatDate(row.uploadedDate)}</td>
-                      <td className="px-4 py-5 text-[#666666]">{formatDate(row.uploadedDate)}</td>
+                      <td className="px-4 py-5 text-[#666666]">—</td>
+                      <td className="px-4 py-5 text-[#666666]">—</td>
                       <td className="px-4 py-5 text-right text-[#666666]">▾</td>
                     </tr>
                   );
@@ -803,18 +905,24 @@ export default function CaseDocumentsTab({ caseId }: Props) {
                     </td>
 
                     <td className="px-4 py-5 text-[#2f2f2f]">
-                      <div className="max-w-82.5 wrap-break-word font-medium underline underline-offset-2">
+                      <div className="break-words font-medium underline underline-offset-2">
                         {doc.original_filename}
                       </div>
 
                       {!isEditing ? (
-                        <div className="mt-1 text-xs text-[#7a7a7a]">
-                          {doc.folder_id
-                            ? formatFolderName(folders.find((f) => f.id === doc.folder_id)?.name || "")
-                            : "No folder"}
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#7a7a7a]">
+                          <span>
+                            Folder:{" "}
+                            {doc.folder_id
+                              ? formatFolderName(folders.find((f) => f.id === doc.folder_id)?.name || "")
+                              : "No folder"}
+                          </span>
+                          <span>Type: {doc.document_type}</span>
+                          <span>Size: {formatFileSize(doc.size_bytes)}</span>
+                          <span>Notes: {doc.notes || "—"}</span>
                         </div>
                       ) : (
-                        <div className="mt-3 space-y-3">
+                        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
                           <select
                             value={editDocumentType}
                             onChange={(e) => setEditDocumentType(e.target.value)}
@@ -851,11 +959,30 @@ export default function CaseDocumentsTab({ caseId }: Props) {
                     </td>
 
                     <td className="px-4 py-5 text-[#666666]">—</td>
-                    <td className="px-4 py-5 text-[#2f2f2f]">{doc.uploaded_by || "Gerardo Gonzalez"}</td>
+                    <td className="px-4 py-5 text-[#2f2f2f]">{doc.uploaded_by || "—"}</td>
                     <td className="px-4 py-5 text-[#2f2f2f]">{shortDocId(doc.id)}</td>
                     <td className="px-4 py-5 text-[#2f2f2f]">{formatDate(doc.created_at)}</td>
                     <td className="px-4 py-5 text-[#2f2f2f]">{formatDate(doc.created_at)}</td>
-                    <td className="px-4 py-5 text-right text-[#666666]">▾</td>
+                    <td className="px-4 py-5 text-right text-[#666666]">
+                      {isEditing ? (
+                        <button
+                          type="button"
+                          onClick={cancelEditingDocument}
+                          className="text-sm hover:text-[#333333]"
+                        >
+                          ×
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEditingDocument(doc)}
+                          className="text-sm hover:text-[#333333]"
+                          aria-label="Edit row"
+                        >
+                          ▾
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })
