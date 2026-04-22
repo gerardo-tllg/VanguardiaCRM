@@ -1,22 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type RouteContext = {
-  params: Promise<{ caseId: string; documentId: string }>;
+  params: Promise<{ caseId: string }>;
 };
 
-function getString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+function sanitizeFileName(name: string) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-export async function PATCH(req: NextRequest, context: RouteContext) {
+export async function GET(_req: Request, context: RouteContext) {
   try {
-    const { caseId, documentId } = await context.params;
-    const body = await req.json();
+    const { caseId } = await context.params;
 
     const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
-      .select("id, case_number")
+      .select("id")
       .eq("case_number", caseId)
       .single();
 
@@ -24,62 +23,28 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Case not found" }, { status: 404 });
     }
 
-    const { data: existingDoc, error: docError } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("case_documents")
       .select("*")
-      .eq("id", documentId)
       .eq("case_id", caseRecord.id)
-      .single();
+      .order("created_at", { ascending: false });
 
-    if (docError || !existingDoc) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const documentType = getString(body.document_type) ?? existingDoc.document_type;
-    const notes =
-      typeof body.notes === "string" ? body.notes : existingDoc.notes ?? null;
-
-    const folderId =
-      body.folder_id === null || body.folder_id === ""
-        ? null
-        : getString(body.folder_id) ?? existingDoc.folder_id ?? null;
-
-    const { data: updatedDoc, error: updateError } = await supabaseAdmin
-      .from("case_documents")
-      .update({
-        document_type: documentType,
-        notes,
-        folder_id: folderId,
-      })
-      .eq("id", documentId)
-      .eq("case_id", caseRecord.id)
-      .select()
-      .single();
-
-    if (updateError || !updatedDoc) {
-      return NextResponse.json(
-        { error: updateError?.message || "Failed to update document" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { success: true, document: updatedDoc },
-      { status: 200 }
-    );
+    return NextResponse.json({ documents: data ?? [] }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to update document",
-      },
+      { error: error instanceof Error ? error.message : "Server error" },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(_req: NextRequest, context: RouteContext) {
+export async function POST(req: Request, context: RouteContext) {
   try {
-    const { caseId, documentId } = await context.params;
+    const { caseId } = await context.params;
 
     const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
@@ -91,49 +56,75 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Case not found" }, { status: 404 });
     }
 
-    const { data: doc, error: docError } = await supabaseAdmin
+    const formData = await req.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "File is required" }, { status: 400 });
+    }
+
+    const documentType =
+      typeof formData.get("document_type") === "string"
+        ? String(formData.get("document_type"))
+        : typeof formData.get("category") === "string"
+          ? String(formData.get("category"))
+          : "general";
+
+    const notes =
+      typeof formData.get("notes") === "string"
+        ? String(formData.get("notes"))
+        : null;
+
+    const folderId =
+      typeof formData.get("folder_id") === "string" && String(formData.get("folder_id")).trim()
+        ? String(formData.get("folder_id"))
+        : null;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
+
+    const safeName = sanitizeFileName(file.name);
+    const storagePath = `${caseRecord.case_number}/${Date.now()}-${safeName}`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from("case-documents")
+      .upload(storagePath, fileBuffer, {
+        contentType: file.type || "application/octet-stream",
+      });
+
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    }
+
+    const { data: docRow, error: insertError } = await supabaseAdmin
       .from("case_documents")
-      .select("*")
-      .eq("id", documentId)
-      .eq("case_id", caseRecord.id)
+      .insert({
+        case_id: caseRecord.id,
+        original_filename: file.name,
+        storage_path: storagePath,
+        mime_type: file.type || null,
+        document_url: storagePath,
+        size_bytes: file.size,
+        document_type: documentType,
+        notes,
+        folder_id: folderId,
+      })
+      .select()
       .single();
 
-    if (docError || !doc) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
-    }
+    if (insertError || !docRow) {
+      await supabaseAdmin.storage.from("case-documents").remove([storagePath]);
 
-    if (doc.storage_path) {
-      const { error: storageError } = await supabaseAdmin.storage
-        .from("case-documents")
-        .remove([doc.storage_path]);
-
-      if (storageError) {
-        return NextResponse.json(
-          { error: storageError.message || "Failed to delete file from storage" },
-          { status: 500 }
-        );
-      }
-    }
-
-    const { error: deleteError } = await supabaseAdmin
-      .from("case_documents")
-      .delete()
-      .eq("id", documentId)
-      .eq("case_id", caseRecord.id);
-
-    if (deleteError) {
       return NextResponse.json(
-        { error: deleteError.message || "Failed to delete document record" },
+        { error: insertError?.message || "Failed to save document" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({ success: true, document: docRow }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to delete document",
-      },
+      { error: error instanceof Error ? error.message : "Upload failed" },
       { status: 500 }
     );
   }
