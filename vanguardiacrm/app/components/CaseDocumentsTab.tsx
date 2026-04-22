@@ -834,7 +834,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
       ) : null}
 
       <div className="w-full overflow-x-auto">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-245 text-sm">
           <thead className="bg-[#efefef] text-left text-[#4a4a4a]">
             <tr>
               <th className="w-12 px-4 py-4">
