@@ -449,14 +449,25 @@ export default function CaseDocumentsTab({ caseId }: Props) {
     }
   }
 
+  function getDocumentIdsForSelectedFolders() {
+    const folderDocumentIds = documents
+      .filter((doc) => doc.folder_id && selectedFolderIds.includes(doc.folder_id))
+      .map((doc) => doc.id);
+
+    return folderDocumentIds;
+  }
+
   async function handleBulkDownload() {
-    if (selectedIds.length === 0) return;
+    const folderDocumentIds = getDocumentIdsForSelectedFolders();
+    const idsToDownload = Array.from(new Set([...selectedIds, ...folderDocumentIds]));
+
+    if (idsToDownload.length === 0) return;
 
     setBulkDownloading(true);
     setError(null);
 
     try {
-      for (const id of selectedIds) {
+      for (const id of idsToDownload) {
         await downloadDocument(id);
       }
     } catch (err) {
@@ -716,7 +727,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
               <button
                 type="button"
                 onClick={handleBulkDownload}
-                disabled={selectedIds.length === 0 || bulkDownloading || bulkDeleting || bulkMoving}
+                disabled={selectedIds.length + selectedFolderIds.length === 0 || bulkDownloading || bulkDeleting || bulkMoving}
                 className="rounded-md border border-[#d1d1d1] bg-white px-3 py-1.5 text-sm font-medium text-[#333333] hover:bg-[#f7f7f7] disabled:opacity-50"
               >
                 {bulkDownloading ? "Downloading..." : "Download Selected"}
