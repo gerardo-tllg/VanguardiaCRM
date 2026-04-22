@@ -876,16 +876,7 @@ export default function CaseDocumentsTab({ caseId }: Props) {
                     <td className="px-4 py-5 text-[#666666]">—</td>
                     <td className="px-4 py-5 text-[#666666]">—</td>
                     <td className="px-4 py-5 text-[#666666]">—</td>
-                    <td className="px-4 py-5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteFolder(row.folder)}
-                        disabled={deletingFolderId === row.folder.id}
-                        className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        {deletingFolderId === row.folder.id ? "Deleting..." : "Delete Folder"}
-                      </button>
-                    </td>
+                    <td className="px-4 py-5 text-right text-[#666666]">▾</td>
                   </tr>
                 );
               }
