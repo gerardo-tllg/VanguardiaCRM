@@ -76,14 +76,24 @@ export default function NewLeadPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f5f5]">
-      <div className="mx-auto max-w-4xl p-6">
-        <div className="mb-6">
+  <main className="min-h-screen bg-[#f5f5f5]">
+    <div className="mx-auto max-w-4xl p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
           <h1 className="text-4xl font-bold text-[#2b2b2b]">New Lead</h1>
           <p className="mt-2 text-[#6b6b6b]">
             Create a manual intake record for attorney review.
           </p>
         </div>
+
+        {/* Back Button */}
+        <a
+          href="/projects"
+          className="rounded-md border border-[#e5e5e5] bg-white px-4 py-2 text-sm text-[#2b2b2b] hover:bg-[#f7f7f7]"
+        >
+          Back to Projects
+        </a>
+      </div>
 
         <form
           onSubmit={handleSubmit}
