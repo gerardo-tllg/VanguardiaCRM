@@ -54,6 +54,9 @@ export async function POST(req: NextRequest) {
         assigned_to: assignedTo,
         accident_date: accidentDate,
         raw_payload: rawPayload,
+        source_channel: "manual",
+        source_medium: "internal",
+        source_campaign: "manual-intake",
       })
       .select()
       .single();

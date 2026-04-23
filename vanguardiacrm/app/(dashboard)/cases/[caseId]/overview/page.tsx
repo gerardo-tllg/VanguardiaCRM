@@ -177,10 +177,14 @@ export default async function CaseOverviewPage({ params }: PageProps) {
     aiScreeningNotes.case_type_confidence
   );
 
-  const recommendation =
-    getString(aiScreeningNotes.recommendation).toLowerCase() === "reject"
-      ? "Reject"
-      : "Accept";
+  const rawRecommendation = getString(aiScreeningNotes.recommendation).toLowerCase();
+
+const recommendation =
+  rawRecommendation === "recommend"
+    ? "Recommend"
+    : rawRecommendation === "not recommend"
+      ? "Not Recommend"
+      : "";
 
   const reasoning = getString(
     aiScreeningNotes.reasoning,
@@ -262,17 +266,19 @@ export default async function CaseOverviewPage({ params }: PageProps) {
               AI Screening Snapshot
             </h3>
 
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                  recommendation === "Accept"
-                    ? "border border-[#b9e4cf] bg-[#ecf8f1] text-[#1f7a4d]"
-                    : "border border-[#dddddd] bg-[#f3f3f3] text-[#6b6b6b]"
-                }`}
-              >
-                Recommendation: {recommendation}
-              </span>
-            </div>
+            {recommendation ? (
+  <div className="mt-4 flex items-center justify-between gap-3">
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+        recommendation === "Recommend"
+          ? "border border-[#b9e4cf] bg-[#ecf8f1] text-[#1f7a4d]"
+          : "border border-[#dddddd] bg-[#f3f3f3] text-[#6b6b6b]"
+      }`}
+    >
+      Recommendation: {recommendation}
+    </span>
+  </div>
+) : null}
 
             <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
               <InfoRow
