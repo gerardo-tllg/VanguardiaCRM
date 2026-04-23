@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const caseType = normalizeString(body.case_type) ?? "Personal Injury";
     const status = normalizeString(body.status) ?? "Welcome!";
     const assignedTo = normalizeString(body.assigned_to) ?? "Admin";
-    const notes = normalizeString(body.notes);
+    const accidentDate = normalizeString(body.accident_date);
 
     const rawPayload =
       body.raw_payload && typeof body.raw_payload === "object"
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         case_type: caseType,
         status,
         assigned_to: assignedTo,
-        notes,
+        accident_date: accidentDate,
         raw_payload: rawPayload,
       })
       .select()
