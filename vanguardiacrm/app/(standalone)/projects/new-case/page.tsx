@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
 
 export default function NewCasePage() {
   const [formData, setFormData] = useState({
@@ -15,6 +17,9 @@ export default function NewCasePage() {
     notes: "",
   });
 
+const router = useRouter();
+const [saving, setSaving] = useState(false);
+
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) {
@@ -24,10 +29,44 @@ export default function NewCasePage() {
     }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    alert("New case saved (MVP placeholder)");
+  async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  setSaving(true);
+
+  try {
+    const res = await fetch("/api/cases", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        client_name: formData.clientName,
+        phone: formData.phone,
+        email: formData.email || null,
+        case_type: formData.caseType,
+        status: formData.status,
+        assigned_to: formData.assignedTo,
+        notes: formData.notes,
+        raw_payload: {
+          accident_date: formData.dateOfIncident || null,
+        },
+      }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      throw new Error(result?.error || "Failed to create case");
+    }
+
+    router.push("/projects");
+    router.refresh();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : "Failed to create case");
+  } finally {
+    setSaving(false);
   }
+}
 
   return (
     <main className="min-h-screen bg-[#f5f5f5]">
@@ -153,11 +192,12 @@ export default function NewCasePage() {
 
           <div className="flex items-center gap-3">
             <button
-              type="submit"
-              className="rounded-md bg-[#4b0a06] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#5f0d08]"
-            >
-              Save Case
-            </button>
+  type="submit"
+  disabled={saving}
+  className="rounded-md bg-[#4b0a06] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-50"
+>
+  {saving ? "Saving..." : "Save Case"}
+</button>
 
             <Link
               href="/projects"
