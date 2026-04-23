@@ -179,12 +179,25 @@ export default async function CaseOverviewPage({ params }: PageProps) {
 
   const rawRecommendation = getString(aiScreeningNotes.recommendation).toLowerCase();
 
-const recommendation =
-  rawRecommendation === "recommend"
-    ? "Recommend"
-    : rawRecommendation === "not recommend"
-      ? "Not Recommend"
-      : "";
+let recommendation: "Recommend" | "Review" | "Do Not Recommend" | "" = "";
+
+// 1. Use explicit AI output if valid
+if (rawRecommendation === "recommend") {
+  recommendation = "Recommend";
+} else if (rawRecommendation === "not recommend" || rawRecommendation === "reject") {
+  recommendation = "Do Not Recommend";
+}
+
+// 2. Otherwise infer from screening score
+else if (screeningScore != null) {
+  if (screeningScore >= 75) {
+    recommendation = "Recommend";
+  } else if (screeningScore >= 50) {
+    recommendation = "Review";
+  } else {
+    recommendation = "Do Not Recommend";
+  }
+}
 
   const reasoning = getString(
     aiScreeningNotes.reasoning,
@@ -266,19 +279,21 @@ const recommendation =
               AI Screening Snapshot
             </h3>
 
-            {recommendation ? (
+            {recommendation && (
   <div className="mt-4 flex items-center justify-between gap-3">
     <span
       className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
         recommendation === "Recommend"
-          ? "border border-[#b9e4cf] bg-[#ecf8f1] text-[#1f7a4d]"
-          : "border border-[#dddddd] bg-[#f3f3f3] text-[#6b6b6b]"
+          ? "border border-[#b9e4cf] bg-[#ecf8f1] text-[#1f7a4d]" // green
+          : recommendation === "Review"
+          ? "border border-[#f5e6b3] bg-[#fff9e6] text-[#8a6d1d]" // yellow
+          : "border border-[#f2b8b5] bg-[#fdecea] text-[#b42318]" // red
       }`}
     >
       Recommendation: {recommendation}
     </span>
   </div>
-) : null}
+)}
 
             <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
               <InfoRow
