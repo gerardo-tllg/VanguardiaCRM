@@ -13,6 +13,7 @@ async function getCount(
   options?: {
     eq?: Array<{ column: string; value: string | number | boolean | null }>;
     neq?: Array<{ column: string; value: string | number | boolean | null }>;
+    in?: Array<{ column: string; value: Array<string | number> }>;
   }
 ) {
   try {
@@ -27,6 +28,10 @@ async function getCount(
 
     for (const filter of options?.neq ?? []) {
       query = query.neq(filter.column, filter.value);
+    }
+
+    for (const filter of options?.in ?? []) {
+      query = query.in(filter.column, filter.value);
     }
 
     const { count, error } = await query;
@@ -69,7 +74,16 @@ export default async function DashboardPage() {
     pendingSignaturesCount,
   ] = await Promise.all([
     getCount("cases", {
-      neq: [{ column: "status", value: "Archived" }],
+      neq: [
+        { column: "status", value: "Archived" },
+        { column: "status", value: "archived" },
+        { column: "status", value: "Closed" },
+        { column: "status", value: "closed" },
+        { column: "status", value: "Complete" },
+        { column: "status", value: "complete" },
+        { column: "status", value: "screening" },
+        { column: "status", value: "Screening" },
+      ],
     }),
     getCount("leads", {
       eq: [{ column: "status", value: "New" }],

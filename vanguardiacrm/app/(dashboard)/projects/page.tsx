@@ -16,6 +16,12 @@ type CaseRecord = {
   created_at: string;
 };
 
+type ProjectsPageProps = {
+  searchParams?: Promise<{
+    view?: string;
+  }>;
+};
+
 function getPhaseStyles(phase: string | null) {
   switch (phase) {
     case "Settlement":
@@ -28,16 +34,54 @@ function getPhaseStyles(phase: string | null) {
   }
 }
 
-export default async function ProjectsPage() {
-  const { data: cases, error } = await supabaseAdmin
-  .from("cases")
-  .select("*")
-  .neq("status", "Archived")
-  .neq("status", "archived")
-  .neq("status", "screening")
-  .neq("status", "Screening")
-  .order("created_at", { ascending: false });
+function normalizeView(value: string | undefined) {
+  if (value === "closed") return "closed";
+  if (value === "archived") return "archived";
+  if (value === "all") return "all";
+  return "active";
+}
 
+function getFilterLabel(view: string) {
+  switch (view) {
+    case "closed":
+      return "Showing Closed Cases";
+    case "archived":
+      return "Showing Archived Cases";
+    case "all":
+      return "Showing All Cases";
+    default:
+      return "Showing Active Cases";
+  }
+}
+
+export default async function ProjectsPage({
+  searchParams,
+}: ProjectsPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const view = normalizeView(resolvedSearchParams.view);
+
+  let query = supabaseAdmin
+    .from("cases")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (view === "active") {
+    query = query
+      .neq("status", "Archived")
+      .neq("status", "archived")
+      .neq("status", "Closed")
+      .neq("status", "closed")
+      .neq("status", "Complete")
+      .neq("status", "complete")
+      .neq("status", "screening")
+      .neq("status", "Screening");
+  } else if (view === "closed") {
+    query = query.in("status", ["Closed", "closed", "Complete", "complete"]);
+  } else if (view === "archived") {
+    query = query.in("status", ["Archived", "archived"]);
+  }
+
+  const { data: cases, error } = await query;
 
   if (error) {
     console.error("Failed to load cases:", {
@@ -69,7 +113,7 @@ export default async function ProjectsPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link
           href="/projects/new-case"
           className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08]"
@@ -84,10 +128,57 @@ export default async function ProjectsPage() {
           New Lead
         </Link>
 
-        <div className="ml-4 rounded-full border border-[#e4c9c4] bg-[#fdf6f5] px-4 py-2 text-sm text-[#4b0a06]">
-          Status is not Complete
+        <div className="ml-4 flex flex-wrap items-center gap-2">
+          <Link
+            href="/projects?view=active"
+            className={`rounded-full px-4 py-2 text-sm ${
+              view === "active"
+                ? "border border-[#e4c9c4] bg-[#fdf6f5] text-[#4b0a06]"
+                : "border border-[#e5e5e5] bg-white text-[#555555] hover:bg-[#f7f7f7]"
+            }`}
+          >
+            Active
+          </Link>
+
+          <Link
+            href="/projects?view=closed"
+            className={`rounded-full px-4 py-2 text-sm ${
+              view === "closed"
+                ? "border border-[#e4c9c4] bg-[#fdf6f5] text-[#4b0a06]"
+                : "border border-[#e5e5e5] bg-white text-[#555555] hover:bg-[#f7f7f7]"
+            }`}
+          >
+            Closed
+          </Link>
+
+          <Link
+            href="/projects?view=archived"
+            className={`rounded-full px-4 py-2 text-sm ${
+              view === "archived"
+                ? "border border-[#e4c9c4] bg-[#fdf6f5] text-[#4b0a06]"
+                : "border border-[#e5e5e5] bg-white text-[#555555] hover:bg-[#f7f7f7]"
+            }`}
+          >
+            Archived
+          </Link>
+
+          <Link
+            href="/projects?view=all"
+            className={`rounded-full px-4 py-2 text-sm ${
+              view === "all"
+                ? "border border-[#e4c9c4] bg-[#fdf6f5] text-[#4b0a06]"
+                : "border border-[#e5e5e5] bg-white text-[#555555] hover:bg-[#f7f7f7]"
+            }`}
+          >
+            All
+          </Link>
+        </div>
+
+        <div className="ml-2 rounded-full border border-[#e4c9c4] bg-[#fdf6f5] px-4 py-2 text-sm text-[#4b0a06]">
+          {getFilterLabel(view)}
         </div>
       </div>
+
       <div className="overflow-hidden rounded-xl border border-[#e5e5e5] bg-white">
         <table className="min-w-full text-sm">
           <thead className="border-b border-[#e5e5e5] bg-[#fafafa] text-left text-[#2b2b2b]">
@@ -96,6 +187,7 @@ export default async function ProjectsPage() {
               <th className="px-5 py-4 font-semibold">Case Name</th>
               <th className="px-5 py-4 font-semibold">Case Type</th>
               <th className="px-5 py-4 font-semibold">Phase</th>
+              <th className="px-5 py-4 font-semibold">Status</th>
               <th className="px-5 py-4 font-semibold">Phone</th>
               <th className="px-5 py-4 font-semibold">Email</th>
               <th className="px-5 py-4 font-semibold">Created</th>
@@ -126,6 +218,7 @@ export default async function ProjectsPage() {
                       {item.phase || "Welcome"}
                     </span>
                   </td>
+                  <td className="px-5 py-4 text-[#555555]">{item.status || "—"}</td>
                   <td className="px-5 py-4 text-[#555555]">{item.phone || "N/A"}</td>
                   <td className="px-5 py-4 text-[#555555]">{item.email || "N/A"}</td>
                   <td className="px-5 py-4 text-[#555555]">
@@ -135,8 +228,8 @@ export default async function ProjectsPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-[#6b6b6b]">
-                  No cases yet.
+                <td colSpan={8} className="px-5 py-8 text-center text-[#6b6b6b]">
+                  No cases found for this view.
                 </td>
               </tr>
             )}
