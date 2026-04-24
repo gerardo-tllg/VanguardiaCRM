@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireApiUser } from "@/lib/auth/require-api-user";
 
 type RouteContext = {
   params: Promise<{ caseId: string; documentId: string }>;
@@ -13,6 +14,12 @@ function encodeFilename(name: string) {
 
 export async function GET(_req: NextRequest, context: RouteContext) {
   try {
+    const { response } = await requireApiUser();
+
+    if (response) {
+      return response;
+    }
+
     const { caseId, documentId } = await context.params;
 
     const { data: caseRecord, error: caseError } = await supabaseAdmin

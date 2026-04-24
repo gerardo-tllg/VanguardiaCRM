@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireApiUser } from "@/lib/auth/require-api-user";
 
 type RouteContext = {
   params: Promise<{ caseId: string; folderId: string }>;
@@ -7,6 +8,11 @@ type RouteContext = {
 
 export async function DELETE(_req: NextRequest, context: RouteContext) {
   try {
+    const { response } = await requireApiUser();
+        
+            if (response) {
+              return response;
+            }
     const { caseId, folderId } = await context.params;
 
     const { data: caseRecord, error: caseError } = await supabaseAdmin

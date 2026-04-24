@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-
+import { requireApiUser } from "@/lib/auth/require-api-user";
 type CreateLeadNoteBody = {
   body?: string;
   author_email?: string;
@@ -11,6 +11,11 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { response } = await requireApiUser();
+                    
+                        if (response) {
+                          return response;
+                        }
     const { id } = await context.params;
     const payload = (await req.json()) as CreateLeadNoteBody;
 

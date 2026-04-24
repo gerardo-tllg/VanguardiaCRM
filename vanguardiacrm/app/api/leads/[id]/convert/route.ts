@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireApiUser } from "@/lib/auth/require-api-user";
 
 const CASE_TYPE_CODES: Record<string, string> = {
   auto_accident: "AA",
@@ -103,6 +104,12 @@ type RouteContext = {
 
 export async function POST(_req: Request, context: RouteContext) {
   try {
+    const { response } = await requireApiUser();
+
+    if (response) {
+      return response;
+    }
+
     const { id } = await context.params;
 
     const { data: lead, error: leadError } = await supabaseAdmin

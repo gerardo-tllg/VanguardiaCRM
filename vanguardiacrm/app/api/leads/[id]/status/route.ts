@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-
+import { requireApiUser } from "@/lib/auth/require-api-user";
 type UpdateLeadStatusBody = {
   status?: "New" | "Reviewed" | "Accepted" | "Rejected" | "Archived";
 };
@@ -10,6 +10,11 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { response } = await requireApiUser();
+                    
+                        if (response) {
+                          return response;
+                        }
     const { id } = await context.params;
     const body = (await req.json()) as UpdateLeadStatusBody;
 

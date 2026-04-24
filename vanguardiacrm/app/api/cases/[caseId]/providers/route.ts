@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireApiUser } from "@/lib/auth/require-api-user";
 
 type RouteContext = {
   params: Promise<{ caseId: string }>;
@@ -13,6 +14,11 @@ function toNullableString(value: unknown) {
 
 export async function POST(req: Request, context: RouteContext) {
   try {
+    const { response } = await requireApiUser();
+            
+                if (response) {
+                  return response;
+                }
     const { caseId } = await context.params;
     const body = await req.json();
 

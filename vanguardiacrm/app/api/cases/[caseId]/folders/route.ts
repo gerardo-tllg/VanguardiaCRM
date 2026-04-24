@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireApiUser } from "@/lib/auth/require-api-user";
 
 type RouteContext = {
   params: Promise<{ caseId: string }>;
@@ -20,6 +21,11 @@ function getNumber(value: unknown): number | null {
 
 export async function GET(_req: Request, context: RouteContext) {
   try {
+    const { response } = await requireApiUser();
+        
+            if (response) {
+              return response;
+            }
     const { caseId } = await context.params;
 
     const { data: caseRecord, error: caseError } = await supabaseAdmin

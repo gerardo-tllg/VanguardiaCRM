@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/client";
+import { requireApiUser } from "@/lib/auth/require-api-user";
 
 type RouteContext = {
   params: Promise<{ providerId: string }>;
@@ -13,6 +14,11 @@ function toNullableString(value: unknown) {
 
 export async function PATCH(req: Request, context: RouteContext) {
   try {
+    const { response } = await requireApiUser();
+        
+            if (response) {
+              return response;
+            }
     const { providerId } = await context.params;
     const body = await req.json();
     const supabase = await createClient();

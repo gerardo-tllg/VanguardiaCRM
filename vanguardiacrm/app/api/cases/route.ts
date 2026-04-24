@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-
+import { requireApiUser } from "@/lib/auth/require-api-user";
 function normalizeString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -11,6 +11,11 @@ function buildCaseNumber() {
 
 export async function POST(req: NextRequest) {
   try {
+    const { response } = await requireApiUser();
+                
+                    if (response) {
+                      return response;
+                    }
     const body = await req.json();
 
     const clientName = normalizeString(body.client_name);
