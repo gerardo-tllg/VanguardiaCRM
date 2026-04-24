@@ -1,7 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+const PUBLIC_ROUTES = [
+  "/login",
+  "/auth/callback",
+];
+
+function isPublicRoute(pathname: string) {
+  return (
+    PUBLIC_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    ) ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/api/auth")
+  );
+}
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
   let response = NextResponse.next({
     request,
   });
@@ -15,17 +33,17 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
 
           response = NextResponse.next({
             request,
           });
 
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
         },
       },
     }
@@ -35,27 +53,27 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
+  if (!user && !isPublicRoute(pathname)) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    redirectUrl.searchParams.set("next", pathname);
 
-  const isPublicRoute =
-    pathname === "/" ||
-    pathname === "/login" ||
-    pathname.startsWith("/auth/callback") ||
-    pathname.startsWith("/api/webhooks") ||
-    pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico";
-
-  if (isPublicRoute) {
-    return response;
+    return NextResponse.redirect(redirectUrl);
   }
 
-  if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (user && pathname === "/login") {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/dashboard";
+    redirectUrl.search = "";
+
+    return NextResponse.redirect(redirectUrl);
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
