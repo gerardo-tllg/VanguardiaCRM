@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatCaseType } from "@/lib/formatters/caseType";
+import { formatPersonName } from "@/lib/formatters/name";
+
 type CaseRecord = {
   id: string;
   case_number: string;
@@ -66,20 +68,12 @@ export default async function ProjectsPage({
     .order("created_at", { ascending: false });
 
   if (view === "active") {
-    query = query
-      .neq("status", "Archived")
-      .neq("status", "archived")
-      .neq("status", "Closed")
-      .neq("status", "closed")
-      .neq("status", "Complete")
-      .neq("status", "complete")
-      .neq("status", "screening")
-      .neq("status", "Screening");
-  } else if (view === "closed") {
-    query = query.in("status", ["Closed", "closed", "Complete", "complete"]);
-  } else if (view === "archived") {
-    query = query.in("status", ["Archived", "archived"]);
-  }
+  query = query.eq("status", "Open");
+} else if (view === "closed") {
+  query = query.eq("status", "Closed");
+} else if (view === "archived") {
+  query = query.eq("status", "Archived");
+}
 
   const { data: cases, error } = await query;
 
@@ -197,13 +191,13 @@ export default async function ProjectsPage({
             {rows.length > 0 ? (
               rows.map((item) => (
                 <tr key={item.id} className="border-b border-[#eeeeee]">
-                  <td className="px-5 py-4 text-[#2b2b2b]">{item.client_name}</td>
+                  <td className="px-5 py-4 text-[#2b2b2b]">{formatPersonName(item.client_name)}</td>
                   <td className="px-5 py-4">
                     <Link
                       href={`/cases/${item.case_number}/overview`}
                       className="text-[#4b0a06] underline"
                     >
-                      {item.client_name} - {item.case_number}
+                      {formatPersonName(item.client_name)} - {item.case_number}
                     </Link>
                   </td>
                   <td className="px-5 py-4 text-[#555555]">
