@@ -1,8 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireApiUser } from "@/lib/auth/require-api-user";
+
 function normalizeString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeCaseTypeForStorage(value: string | null | undefined) {
+  if (!value) return "unknown";
+
+  const normalized = value.toLowerCase().trim();
+
+  const map: Record<string, string> = {
+    auto_accident: "motor_vehicle_accident",
+    mva: "motor_vehicle_accident",
+    "motor vehicle accident": "motor_vehicle_accident",
+    motor_vehicle_accident: "motor_vehicle_accident",
+
+    slip__fall: "slip_fall",
+    slip_fall: "slip_fall",
+    "slip / fall": "slip_fall",
+    "slip and fall": "slip_fall",
+
+    truck_accident: "truck_accident",
+    "truck accident": "truck_accident",
+
+    premises_liability: "premises_liability",
+    "premises liability": "premises_liability",
+
+    personal_injury: "personal_injury",
+    "personal injury": "personal_injury",
+
+    wrongful_death: "wrongful_death",
+    "wrongful death": "wrongful_death",
+  };
+
+  return map[normalized] ?? normalized.replaceAll(" ", "_");
 }
 
 function buildCaseNumber() {
@@ -12,16 +45,19 @@ function buildCaseNumber() {
 export async function POST(req: NextRequest) {
   try {
     const { response } = await requireApiUser();
-                
-                    if (response) {
-                      return response;
-                    }
+
+    if (response) {
+      return response;
+    }
+
     const body = await req.json();
 
     const clientName = normalizeString(body.client_name);
     const phone = normalizeString(body.phone);
     const email = normalizeString(body.email);
-    const caseType = normalizeString(body.case_type) ?? "Personal Injury";
+    const caseType = normalizeCaseTypeForStorage(
+      normalizeString(body.case_type) ?? "Personal Injury"
+    );
     const status = normalizeString(body.status) ?? "Welcome!";
     const assignedTo = normalizeString(body.assigned_to) ?? "Admin";
     const accidentDate = normalizeString(body.accident_date);
@@ -73,10 +109,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(
-      { success: true, case: data },
-      { status: 200 }
-    );
+    return NextResponse.json({ success: true, case: data }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       {
