@@ -127,9 +127,19 @@ export default function CaseNotesPanel({
                 </p>
               </div>
 
-              <p className="whitespace-pre-wrap text-sm text-[#2b2b2b]">
-                {note.body}
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-3">
+  <p className="text-xs font-semibold text-[#2b2b2b]">
+    {note.author_name || note.created_by || "Unknown"}
+  </p>
+
+  <p className="text-xs text-[#777777]">
+    {new Date(note.created_at).toLocaleString()}
+  </p>
+</div>
+
+<p className="whitespace-pre-wrap text-sm text-[#2b2b2b]">
+  {note.body}
+</p>
             </div>
           ))
         )}
