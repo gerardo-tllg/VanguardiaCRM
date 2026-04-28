@@ -18,6 +18,10 @@ type CaseNotesPanelProps = {
   initialNotes: Note[];
 };
 
+function getAuthorLabel(note: Note) {
+  return note.author_name || note.created_by || "Unknown";
+}
+
 export default function CaseNotesPanel({
   caseId,
   initialNotes,
@@ -45,6 +49,12 @@ export default function CaseNotesPanel({
       return;
     }
 
+    const authorName =
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email ||
+      "Staff";
+
     startTransition(async () => {
       const { data, error } = await supabase
         .from("case_notes")
@@ -52,6 +62,7 @@ export default function CaseNotesPanel({
           case_id: caseId,
           body: trimmed,
           created_by: user.id,
+          author_name: authorName,
         })
         .select("*")
         .single();
@@ -107,11 +118,17 @@ export default function CaseNotesPanel({
               key={note.id}
               className="rounded-lg border border-[#ececec] bg-[#fafafa] p-3"
             >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold text-[#2b2b2b]">
+                  {getAuthorLabel(note)}
+                </p>
+                <p className="text-xs text-[#777777]">
+                  {new Date(note.created_at).toLocaleString()}
+                </p>
+              </div>
+
               <p className="whitespace-pre-wrap text-sm text-[#2b2b2b]">
                 {note.body}
-              </p>
-              <p className="mt-2 text-xs text-[#777777]">
-                {new Date(note.created_at).toLocaleString()}
               </p>
             </div>
           ))
