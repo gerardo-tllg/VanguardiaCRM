@@ -1,6 +1,8 @@
 import Link from "next/link";
 import LeadNotesSection from "../components/LeadNotesSection";
 import type { LeadNoteRecord } from "@/types/lead-notes";
+import { formatCaseType } from "@/lib/formatters/caseType";
+import { formatPersonName } from "@/lib/formatters/name";
 
 type LeadDetailProps = {
   lead: {
@@ -32,12 +34,14 @@ function formatCentralTime(dateString: string) {
 
 function getStatusStyles(status: string) {
   switch (status) {
-    case "Accepted":
+    case "Converted":
+      return "bg-[#e7f7ee] text-[#16643f] border border-[#a9d9c0]";
+    case "Qualified":
       return "bg-[#ecf8f1] text-[#1f7a4d] border border-[#b9e4cf]";
+    case "Contacted":
+      return "bg-[#fff7e8] text-[#8a5a00] border border-[#f1d9a6]";
     case "Rejected":
       return "bg-[#f3f3f3] text-[#6b6b6b] border border-[#dddddd]";
-    case "Reviewed":
-      return "bg-[#fff7e8] text-[#8a5a00] border border-[#f1d9a6]";
     case "Archived":
       return "bg-[#f3f3f3] text-[#8a8a8a] border border-[#dddddd]";
     case "New":
@@ -191,11 +195,11 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
           </Link>
 
           <h1 className="mt-3 text-3xl font-bold text-[#2b2b2b] lg:text-4xl">
-            {lead.client_name}
+            {formatPersonName(lead.client_name)}
           </h1>
 
           <p className="mt-2 text-sm text-[#6b6b6b]">
-            {accidentType} · Received {formatCentralTime(lead.created_at)}
+            {formatCaseType(accidentType)} · Received {formatCentralTime(lead.created_at)}
           </p>
         </div>
 
@@ -225,7 +229,7 @@ export default function LeadDetailView({ lead, notes }: LeadDetailProps) {
             </h2>
 
             <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              <InfoRow label="Name" value={lead.client_name} />
+              <InfoRow label="Name" value={formatPersonName(lead.client_name)} />
               <InfoRow label="Phone" value={lead.phone || "N/A"} />
               <InfoRow label="Email" value={lead.email || "N/A"} />
               <InfoRow label="Language" value={language} />

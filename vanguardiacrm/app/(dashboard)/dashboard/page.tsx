@@ -77,7 +77,7 @@ export default async function DashboardPage() {
   eq: [{ column: "status", value: "Open" }],
 }),
     getCount("leads", {
-      eq: [{ column: "status", value: "New" }],
+      in: [{ column: "status", value: ["New", "Under Review"] }],
     }),
     getCount("messages", {
       eq: [{ column: "status", value: "Unread" }],

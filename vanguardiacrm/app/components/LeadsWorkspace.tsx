@@ -73,20 +73,20 @@ function getStatusStyles(status: LeadStatus) {
 
 function uiStatusToDbStatus(
   status: LeadStatus
-): "New" | "Reviewed" | "Accepted" | "Rejected" | "Archived" {
+): "New" | "Contacted" | "Qualified" | "Converted" | "Rejected" | "Archived" {
   switch (status) {
     case "New Intake":
       return "New";
     case "Under Review":
-      return "Reviewed";
+      return "Contacted";
     case "Accepted":
-      return "Accepted";
+      return "Qualified";
     case "Rejected":
       return "Rejected";
     case "Archived":
       return "Archived";
     case "Converted to Case":
-      return "Accepted";
+      return "Converted";
     default:
       return "New";
   }

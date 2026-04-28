@@ -103,9 +103,10 @@ function scoreToPriority(score: number): "Low" | "Medium" | "High" {
 
 export default async function LeadsPage() {
   const { data, error } = await supabaseAdmin
-    .from("leads")
-    .select("*")
-    .order("created_at", { ascending: false });
+  .from("leads")
+  .select("*")
+  .in("status", ["New", "Contacted", "Qualified"])
+  .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Failed to load leads:", {
@@ -185,16 +186,19 @@ export default async function LeadsPage() {
         parseJsonRecord(nested.ai_screening_notes);
 
     const statusMap: Record<
-      string,
-      "New Intake" | "Under Review" | "Accepted" | "Rejected" | "Converted to Case" | "Archived"
-    > = {
-      New: "New Intake",
-      Reviewed: "Under Review",
-      Accepted: "Accepted",
-      Rejected: "Rejected",
-      Archived: "Archived",
-      "Converted to Case": "Converted to Case",
-    };
+  string,
+  "New Intake" | "Under Review" | "Accepted" | "Rejected" | "Converted to Case" | "Archived"
+> = {
+  New: "New Intake",
+  Contacted: "Under Review",
+  Qualified: "Under Review",
+  Accepted: "Accepted",
+  Rejected: "Rejected",
+  Converted: "Converted to Case",
+  Archived: "Archived",
+  Reviewed: "Under Review",
+  "Converted to Case": "Converted to Case",
+};
 
     const accidentType =
       lead.accident_type ??
