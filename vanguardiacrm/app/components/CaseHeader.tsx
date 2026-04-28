@@ -1,4 +1,6 @@
 "use client";
+import { formatCaseType } from "@/lib/formatters/caseType";
+import { formatPersonName } from "@/lib/formatters/name";
 
 type CaseHeaderProps = {
   caseData: {
@@ -47,12 +49,12 @@ export default function CaseHeader({ caseData }: CaseHeaderProps) {
         <div className="flex items-start justify-between gap-6">
           <div>
             <h1 className="text-3xl font-bold text-[#2b2b2b]">
-              {caseData.clientName} - DOI {caseData.dateOfIncident}
+              {formatPersonName(caseData.clientName)} - DOI {caseData.dateOfIncident}
             </h1>
 
             <p className="mt-2 text-sm text-[#6b6b6b]">
-              {caseData.phone} | {caseData.email} | {caseData.caseType} |{" "}
-              {caseData.office} | {caseData.assignedTo}
+              {caseData.phone} | {caseData.email} | {formatCaseType(caseData.caseType)} |{" "}
+              {caseData.office} | {formatPersonName(caseData.assignedTo)}
             </p>
           </div>
 
