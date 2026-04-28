@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-
+import { formatCaseType } from "@/lib/formatters/caseType";
 type CaseRecord = {
   id: string;
   case_number: string;
@@ -207,8 +207,8 @@ export default async function ProjectsPage({
                     </Link>
                   </td>
                   <td className="px-5 py-4 text-[#555555]">
-                    {item.case_type || "Personal Injury"}
-                  </td>
+  {formatCaseType(item.case_type)}
+</td>
                   <td className="px-5 py-4">
                     <span
                       className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getPhaseStyles(
