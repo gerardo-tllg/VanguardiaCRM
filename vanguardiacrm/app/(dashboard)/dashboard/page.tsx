@@ -74,17 +74,8 @@ export default async function DashboardPage() {
     pendingSignaturesCount,
   ] = await Promise.all([
     getCount("cases", {
-      neq: [
-        { column: "status", value: "Archived" },
-        { column: "status", value: "archived" },
-        { column: "status", value: "Closed" },
-        { column: "status", value: "closed" },
-        { column: "status", value: "Complete" },
-        { column: "status", value: "complete" },
-        { column: "status", value: "screening" },
-        { column: "status", value: "Screening" },
-      ],
-    }),
+  eq: [{ column: "status", value: "Open" }],
+}),
     getCount("leads", {
       eq: [{ column: "status", value: "New" }],
     }),
