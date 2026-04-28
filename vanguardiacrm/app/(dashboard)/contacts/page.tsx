@@ -1,100 +1,148 @@
-type FormSubmission = {
+export const dynamic = "force-dynamic";
+
+import ContactsTable, { type ContactRow } from "../../components/ContactsTable";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+
+type RawContactCase = {
   id: string;
-  contact: string;
-  project: string;
-  form: string;
-  status: string;
-  lastModified: string;
+  relationship: string | null;
+  cases:
+    | {
+        id: string;
+        case_number: string | null;
+        client_name: string | null;
+        case_type: string | null;
+        status: string | null;
+        phase: string | null;
+        created_at: string | null;
+      }
+    | {
+        id: string;
+        case_number: string | null;
+        client_name: string | null;
+        case_type: string | null;
+        status: string | null;
+        phase: string | null;
+        created_at: string | null;
+      }[]
+    | null;
 };
 
-type FormsSubmissionsTableProps = {
-  submissions: FormSubmission[];
+type RawContact = {
+  id: string;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  contact_type: string | null;
+  company: string | null;
+  city: string | null;
+  status: string | null;
+  contact_cases: RawContactCase[] | null;
 };
 
-function getStatusStyles(status: string) {
-  switch (status) {
-    case "Completed":
-      return "bg-[#ecf8f1] text-[#1f7a4d] border border-[#b9e4cf]";
-    case "In Progress":
-      return "bg-[#eef4ff] text-[#1d4f91] border border-[#c9daf7]";
-    case "Not Started":
-      return "bg-[#fff7e8] text-[#8a5a00] border border-[#f1d9a6]";
-    default:
-      return "bg-[#f8f8f8] text-[#444444] border border-[#e5e5e5]";
-  }
+function normalizeContactRows(rows: RawContact[]): ContactRow[] {
+  return rows.map((contact) => ({
+    id: contact.id,
+    first_name: contact.first_name,
+    middle_name: contact.middle_name,
+    last_name: contact.last_name,
+    full_name: contact.full_name,
+    email: contact.email,
+    phone: contact.phone,
+    contact_type: contact.contact_type,
+    company: contact.company,
+    city: contact.city,
+    status: contact.status,
+    contact_cases: (contact.contact_cases ?? []).map((link) => {
+      const caseRecord = Array.isArray(link.cases) ? link.cases[0] ?? null : link.cases;
+
+      return {
+        id: link.id,
+        relationship: link.relationship,
+        case: caseRecord
+          ? {
+              id: caseRecord.id,
+              case_number: caseRecord.case_number,
+              client_name: caseRecord.client_name,
+              case_type: caseRecord.case_type,
+              status: caseRecord.status,
+              phase: caseRecord.phase,
+              created_at: caseRecord.created_at,
+            }
+          : null,
+      };
+    }),
+  }));
 }
 
-export default function FormsSubmissionsTable({
-  submissions,
-}: FormsSubmissionsTableProps) {
+export default async function ContactsPage() {
+  const { data, error } = await supabaseAdmin
+    .from("contacts")
+    .select(
+      `
+      id,
+      first_name,
+      middle_name,
+      last_name,
+      full_name,
+      email,
+      phone,
+      contact_type,
+      company,
+      city,
+      status,
+      contact_cases (
+        id,
+        relationship,
+        cases (
+          id,
+          case_number,
+          client_name,
+          case_type,
+          status,
+          phase,
+          created_at
+        )
+      )
+    `
+    )
+    .order("last_name", { ascending: true, nullsFirst: false })
+    .order("first_name", { ascending: true, nullsFirst: false });
+
+  if (error) {
+    console.error("Failed to load contacts:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+  }
+
+  const contacts = normalizeContactRows((data ?? []) as unknown as RawContact[]);
+
   return (
-    <div className="overflow-hidden rounded-xl border border-[#e5e5e5] bg-white">
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="border-b border-[#e5e5e5] bg-[#f8f8f8]">
-            <tr className="text-left text-[#2b2b2b]">
-              <th className="px-5 py-4 font-semibold">Contact</th>
-              <th className="px-5 py-4 font-semibold">Project</th>
-              <th className="px-5 py-4 font-semibold">Form</th>
-              <th className="px-5 py-4 font-semibold">Status</th>
-              <th className="px-5 py-4 font-semibold">Last Modified</th>
-              <th className="px-5 py-4 font-semibold"></th>
-            </tr>
-          </thead>
+    <>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold text-[#2b2b2b]">Contacts</h1>
+          <p className="mt-2 text-[#6b6b6b]">
+            Firm contacts, linked projects, and contact details.
+          </p>
+        </div>
 
-          <tbody>
-            {submissions.length > 0 ? (
-              submissions.map((submission) => (
-                <tr
-                  key={submission.id}
-                  className="border-b border-[#eeeeee] last:border-b-0 hover:bg-[#fcfaf9]"
-                >
-                  <td className="px-5 py-4">
-                    <span className="inline-flex rounded-full bg-[#f1f1f1] px-4 py-2 text-sm text-[#2b2b2b]">
-                      {submission.contact}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span className="inline-flex rounded-full bg-[#f1f1f1] px-4 py-2 text-sm text-[#2b2b2b]">
-                      {submission.project}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4 text-[#2b2b2b]">
-                    {submission.form}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStatusStyles(
-                        submission.status
-                      )}`}
-                    >
-                      {submission.status}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4 text-[#444444]">
-                    {submission.lastModified}
-                  </td>
-
-                  <td className="px-5 py-4 text-right text-[#6b6b6b]">◉</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-5 py-8 text-center text-sm text-[#6b6b6b]"
-                >
-                  No form submissions found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <div className="w-70">
+          <input
+            type="text"
+            placeholder="Search"
+            className="w-full rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
+          />
+        </div>
       </div>
-    </div>
+
+      <ContactsTable contacts={contacts} />
+    </>
   );
 }
