@@ -137,12 +137,22 @@ export default function ContactsTable({ contacts = [] }: ContactsTableProps) {
                     key={contact.id}
                     className="border-b border-[#eeeeee] last:border-b-0 hover:bg-[#fcfaf9]"
                   >
-                    <td className="px-5 py-4 font-medium text-[#2b2b2b]">
-                      {getFirstName(contact)}
+                    <td className="px-5 py-4 font-medium">
+                      <Link
+                        href={`/contacts/${contact.id}`}
+                        className="text-[#2b2b2b] underline underline-offset-2 hover:text-[#4b0a06]"
+                      >
+                        {getFirstName(contact)}
+                      </Link>
                     </td>
 
-                    <td className="px-5 py-4 font-medium text-[#2b2b2b]">
-                      {getLastName(contact)}
+                    <td className="px-5 py-4 font-medium">
+                      <Link
+                        href={`/contacts/${contact.id}`}
+                        className="text-[#2b2b2b] underline underline-offset-2 hover:text-[#4b0a06]"
+                      >
+                        {getLastName(contact)}
+                      </Link>
                     </td>
 
                     <td className="px-5 py-4">
@@ -166,9 +176,12 @@ export default function ContactsTable({ contacts = [] }: ContactsTableProps) {
                           </Link>
 
                           {remainingCount > 0 ? (
-                            <span className="inline-flex rounded-full border border-[#e5e5e5] bg-white px-3 py-1 text-xs text-[#555555]">
+                            <Link
+                              href={`/contacts/${contact.id}`}
+                              className="inline-flex rounded-full border border-[#e5e5e5] bg-white px-3 py-1 text-xs text-[#555555] hover:bg-[#f7f7f7] hover:text-[#4b0a06]"
+                            >
                               +{remainingCount} more
-                            </span>
+                            </Link>
                           ) : null}
                         </div>
                       ) : (
