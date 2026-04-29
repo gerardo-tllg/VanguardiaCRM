@@ -80,37 +80,34 @@ function normalizeContactRows(rows: RawContact[]): ContactRow[] {
 
 export default async function ContactsPage() {
   const { data, error } = await supabaseAdmin
-    .from("contacts")
-    .select(
-      `
-      id,
-      first_name,
-      middle_name,
-      last_name,
-      full_name,
-      email,
-      phone,
-      contact_type,
-      company,
-      city,
-      status,
-      contact_cases (
-        id,
-        relationship,
-        cases (
-          id,
-          case_number,
-          client_name,
-          case_type,
-          status,
-          phase,
-          created_at
-        )
-      )
+  .from("contacts")
+  .select(
     `
+    id,
+    first_name,
+    middle_name,
+    last_name,
+    full_name,
+    email,
+    phone,
+    contact_type,
+    contact_cases (
+      id,
+      relationship,
+      cases (
+        id,
+        case_number,
+        client_name,
+        case_type,
+        status,
+        phase,
+        created_at
+      )
     )
-    .order("last_name", { ascending: true, nullsFirst: false })
-    .order("first_name", { ascending: true, nullsFirst: false });
+  `
+  )
+  .order("last_name", { ascending: true, nullsFirst: false })
+  .order("first_name", { ascending: true, nullsFirst: false });
 
   if (error) {
     console.error("Failed to load contacts:", {
