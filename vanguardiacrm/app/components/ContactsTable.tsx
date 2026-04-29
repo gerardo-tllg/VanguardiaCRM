@@ -128,7 +128,13 @@ export default function ContactsTable({ contacts = [] }: ContactsTableProps) {
           <tbody>
             {contacts.length > 0 ? (
               contacts.map((contact) => {
-                const linkedCases = contact.contact_cases ?? [];
+                const linkedCases = Array.from(
+  new Map(
+    (contact.contact_cases ?? [])
+      .filter((link) => link.case?.id)
+      .map((link) => [link.case!.id, link])
+  ).values()
+);
                 const firstCase = linkedCases[0]?.case ?? null;
                 const remainingCount = Math.max(linkedCases.length - 1, 0);
 
