@@ -69,7 +69,7 @@ function normalizeContactRows(rows: RawContact[]): ContactRow[] {
               client_name: caseRecord.client_name,
               case_type: caseRecord.case_type,
               status: caseRecord.status,
-              phase: caseRecord.phase,
+              phase: caseRecord.phase ?? "Welcome",
               created_at: caseRecord.created_at,
             }
           : null,
