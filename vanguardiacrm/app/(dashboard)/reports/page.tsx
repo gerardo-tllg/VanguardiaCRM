@@ -1,6 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  formatSourceChannel,
+  formatCampaign,
+} from "@/lib/formatters/source";
 
 type LeadRow = {
   id: string;
@@ -118,9 +122,6 @@ export default async function ReportsPage() {
           <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
             {totalLeads}
           </div>
-          <p className="mt-3 text-sm text-[#8a8a8a]">
-            All leads currently stored in the CRM.
-          </p>
         </div>
 
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
@@ -128,9 +129,6 @@ export default async function ReportsPage() {
           <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
             {convertedCases}
           </div>
-          <p className="mt-3 text-sm text-[#8a8a8a]">
-            Leads that have been converted into cases.
-          </p>
         </div>
 
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
@@ -138,9 +136,6 @@ export default async function ReportsPage() {
           <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
             {formatPercent(conversionRate)}
           </div>
-          <p className="mt-3 text-sm text-[#8a8a8a]">
-            Converted cases divided by total leads.
-          </p>
         </div>
       </div>
 
@@ -149,9 +144,6 @@ export default async function ReportsPage() {
           <h2 className="text-2xl font-semibold text-[#2b2b2b]">
             Lead Conversion by Source
           </h2>
-          <p className="mt-2 text-sm text-[#6b6b6b]">
-            Tracks which source channels and campaigns are producing actual cases.
-          </p>
         </div>
 
         <div className="overflow-x-auto">
@@ -176,18 +168,22 @@ export default async function ReportsPage() {
                       key={`${row.source_channel}-${row.source_campaign}`}
                       className="border-b border-[#eeeeee] last:border-b-0"
                     >
-                      <td className="px-5 py-4 font-medium text-[#2b2b2b]">
-                        {row.source_channel}
+                      <td className="px-5 py-4 font-medium">
+                        {formatSourceChannel(row.source_channel)}
                       </td>
+
                       <td className="px-5 py-4 text-[#555555]">
-                        {row.source_campaign}
+                        {formatCampaign(row.source_campaign)}
                       </td>
+
                       <td className="px-5 py-4 text-[#555555]">
                         {row.total_leads}
                       </td>
+
                       <td className="px-5 py-4 text-[#555555]">
                         {row.converted_cases}
                       </td>
+
                       <td className="px-5 py-4">
                         <span className="inline-flex rounded-full border border-[#e4c9c4] bg-[#fdf6f5] px-3 py-1 text-xs font-medium text-[#4b0a06]">
                           {formatPercent(rate)}
@@ -216,29 +212,20 @@ export default async function ReportsPage() {
           <h2 className="text-2xl font-semibold text-[#2b2b2b]">
             Case Pipeline
           </h2>
-          <p className="mt-2 text-sm text-[#6b6b6b]">
-            Current cases grouped by phase.
-          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
-          {phaseRows.length > 0 ? (
-            phaseRows.map((row) => (
-              <div
-                key={row.phase}
-                className="rounded-xl border border-[#eeeeee] bg-[#fafafa] p-5"
-              >
-                <div className="text-sm text-[#6b6b6b]">{row.phase}</div>
-                <div className="mt-2 text-2xl font-bold text-[#2b2b2b]">
-                  {row.count}
-                </div>
+          {phaseRows.map((row) => (
+            <div
+              key={row.phase}
+              className="rounded-xl border border-[#eeeeee] bg-[#fafafa] p-5"
+            >
+              <div className="text-sm text-[#6b6b6b]">{row.phase}</div>
+              <div className="mt-2 text-2xl font-bold text-[#2b2b2b]">
+                {row.count}
               </div>
-            ))
-          ) : (
-            <div className="rounded-xl border border-[#eeeeee] bg-[#fafafa] p-5 text-sm text-[#6b6b6b]">
-              No case pipeline data found.
             </div>
-          )}
+          ))}
         </div>
       </div>
     </>
