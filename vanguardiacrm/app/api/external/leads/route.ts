@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -11,17 +14,19 @@ function normalizePhone(value: unknown): string | null {
   return digits || null;
 }
 
-// 🔍 OPTIONAL: helps debug if route is being hit
 export async function GET() {
-  return NextResponse.json(
-    { message: "External leads endpoint is live" },
-    { status: 200 }
-  );
+  return NextResponse.json({
+    message: "External leads endpoint is live",
+    methods: ["GET", "POST", "OPTIONS"],
+  });
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { status: 200 });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // 🔐 API KEY AUTH
     const authHeader = req.headers.get("authorization");
     const expectedKey = process.env.ACCIDENTINTEL_API_KEY;
 
@@ -35,21 +40,17 @@ export async function POST(req: NextRequest) {
     const token = authHeader.replace("Bearer ", "").trim();
 
     if (!expectedKey || token !== expectedKey) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
 
-    // 🧾 VALIDATION
     const clientName = normalizeString(body.client_name);
     const phone = normalizePhone(body.phone);
     const email = normalizeString(body.email);
     const accidentDate = normalizeString(body.accident_date);
     const accidentType =
-      normalizeString(body.accident_type) ?? "Motor Vehicle Accident";
+      normalizeString(body.accident_type) ?? "motor_vehicle_accident";
 
     if (!clientName) {
       return NextResponse.json(
@@ -72,57 +73,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 📦 PAYLOAD
-    const insertPayload = {
-      client_name: clientName,
-      phone,
-      email,
-      accident_date: accidentDate,
-      accident_type: accidentType,
-
-      screening_score:
-        typeof body.screening_score === "number"
-          ? body.screening_score
-          : null,
-
-      accident_location: normalizeString(body.accident_location),
-      accident_description: normalizeString(body.accident_description),
-
-      source_channel: "accidentintel",
-      source_medium: "api",
-      source_campaign:
-        normalizeString(body.source_campaign) ?? "accidentintel-live",
-
-      status: "New",
-      raw_payload: body,
-    };
-
     const { data: lead, error } = await supabaseAdmin
       .from("leads")
-      .insert(insertPayload)
+      .insert({
+        client_name: clientName,
+        phone,
+        email,
+        accident_date: accidentDate,
+        accident_type: accidentType,
+        accident_location: normalizeString(body.accident_location),
+        accident_description: normalizeString(body.accident_description),
+        screening_score:
+          typeof body.screening_score === "number"
+            ? body.screening_score
+            : null,
+        source_channel: "accidentintel",
+        source_medium: "api",
+        source_campaign:
+          normalizeString(body.source_campaign) ?? "accidentintel-live",
+        status: "New",
+        raw_payload: body,
+      })
       .select()
       .single();
 
     if (error || !lead) {
       return NextResponse.json(
-        {
-          error: error?.message || "Failed to create lead",
-          details: error,
-        },
+        { error: error?.message || "Failed to create lead" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(
-      { success: true, lead },
-      { status: 200 }
-    );
+    return NextResponse.json({ success: true, lead }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Invalid request",
-      },
+      { error: error instanceof Error ? error.message : "Invalid request" },
       { status: 400 }
     );
   }
