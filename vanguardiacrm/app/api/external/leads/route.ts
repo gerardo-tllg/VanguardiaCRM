@@ -11,6 +11,14 @@ function normalizePhone(value: unknown): string | null {
   return digits || null;
 }
 
+// 🔍 OPTIONAL: helps debug if route is being hit
+export async function GET() {
+  return NextResponse.json(
+    { message: "External leads endpoint is live" },
+    { status: 200 }
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     // 🔐 API KEY AUTH
@@ -35,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    
+    // 🧾 VALIDATION
     const clientName = normalizeString(body.client_name);
     const phone = normalizePhone(body.phone);
     const email = normalizeString(body.email);
@@ -64,7 +72,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    
+    // 📦 PAYLOAD
     const insertPayload = {
       client_name: clientName,
       phone,
@@ -72,25 +80,22 @@ export async function POST(req: NextRequest) {
       accident_date: accidentDate,
       accident_type: accidentType,
 
-      // accidentintel fields
-      screening_score: typeof body.screening_score === "number"
-        ? body.screening_score
-        : null,
+      screening_score:
+        typeof body.screening_score === "number"
+          ? body.screening_score
+          : null,
 
       accident_location: normalizeString(body.accident_location),
       accident_description: normalizeString(body.accident_description),
 
-      // SOURCE TRACKING (FOR REPORTING)
       source_channel: "accidentintel",
       source_medium: "api",
       source_campaign:
         normalizeString(body.source_campaign) ?? "accidentintel-live",
 
-      
       status: "New",
       raw_payload: body,
     };
-
 
     const { data: lead, error } = await supabaseAdmin
       .from("leads")
@@ -100,7 +105,10 @@ export async function POST(req: NextRequest) {
 
     if (error || !lead) {
       return NextResponse.json(
-        { error: error?.message || "Failed to create lead" },
+        {
+          error: error?.message || "Failed to create lead",
+          details: error,
+        },
         { status: 500 }
       );
     }
