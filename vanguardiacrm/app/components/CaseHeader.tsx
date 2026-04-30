@@ -1,4 +1,6 @@
 "use client";
+
+import { useState } from "react";
 import { formatCaseType } from "@/lib/formatters/caseType";
 import { formatPersonName } from "@/lib/formatters/name";
 
@@ -16,79 +18,118 @@ type CaseHeaderProps = {
   };
 };
 
-const caseStatuses = [
-  "Intake",
-  "Treating",
-  "Demanded",
-  "Litigation",
-  "Settled",
+const casePhases = [
+  "Welcome",
+  "Treatment Phase",
+  "Demand Prep",
+  "Demand Sent",
+  "Negotiation",
+  "Settlement",
   "Closed",
 ];
 
-function getStatusStyles(status: string) {
-  switch (status) {
-    case "Settled":
+function getPhaseStyles(phase: string) {
+  switch (phase) {
+    case "Settlement":
     case "Closed":
       return "border-[#b9e4cf] bg-[#ecf8f1] text-[#1f7a4d]";
-    case "Litigation":
+    case "Negotiation":
       return "border-[#dec8f7] bg-[#f8f0ff] text-[#6b2ea6]";
-    case "Demanded":
+    case "Demand Prep":
+    case "Demand Sent":
       return "border-[#c9daf7] bg-[#eef4ff] text-[#1d4f91]";
-    case "Intake":
+    case "Welcome":
       return "border-[#f1d9a6] bg-[#fff7e8] text-[#8a5a00]";
-    case "Treating":
+    case "Treatment Phase":
     default:
       return "border-[#e4c9c4] bg-[#fdf6f5] text-[#4b0a06]";
   }
 }
 
 export default function CaseHeader({ caseData }: CaseHeaderProps) {
+  const [phase, setPhase] = useState(caseData.status || "Welcome");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handlePhaseChange(nextPhase: string) {
+    const previousPhase = phase;
+
+    setPhase(nextPhase);
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/cases/${caseData.id}/phase`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phase: nextPhase,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result?.error || "Failed to update case phase");
+      }
+    } catch (error) {
+      setPhase(previousPhase);
+      setError(
+        error instanceof Error ? error.message : "Failed to update case phase"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <header className="border-b border-[#e5e5e5] bg-white px-6 py-5">
       <div className="flex flex-col gap-5">
         <div className="flex items-start justify-between gap-6">
           <div>
             <h1 className="text-3xl font-bold text-[#2b2b2b]">
-              {formatPersonName(caseData.clientName)} - DOI {caseData.dateOfIncident}
+              {formatPersonName(caseData.clientName)} - DOI{" "}
+              {caseData.dateOfIncident}
             </h1>
 
             <p className="mt-2 text-sm text-[#6b6b6b]">
-              {caseData.phone} | {caseData.email} | {formatCaseType(caseData.caseType)} |{" "}
-              {caseData.office} | {formatPersonName(caseData.assignedTo)}
+              {caseData.phone} | {caseData.email} |{" "}
+              {formatCaseType(caseData.caseType)} | {caseData.office} |{" "}
+              {formatPersonName(caseData.assignedTo)}
             </p>
+
+            {error ? (
+              <p className="mt-2 text-sm text-red-600">{error}</p>
+            ) : null}
           </div>
 
-          <div className="min-w-45">
+          <div className="min-w-50">
             <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
-              Case Status
+              Case Phase
             </label>
+
             <select
-              defaultValue={caseData.status}
-              className={`w-full rounded-md border px-4 py-2 text-sm font-medium outline-none ${getStatusStyles(
-                caseData.status
+              value={phase}
+              disabled={saving}
+              onChange={(event) => handlePhaseChange(event.target.value)}
+              className={`w-full rounded-md border px-4 py-2 text-sm font-medium outline-none disabled:opacity-60 ${getPhaseStyles(
+                phase
               )}`}
             >
-              {caseStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
+              {casePhases.map((phaseOption) => (
+                <option key={phaseOption} value={phaseOption}>
+                  {phaseOption}
                 </option>
               ))}
             </select>
+
+            {saving ? (
+              <p className="mt-2 text-xs text-[#6b6b6b]">Saving...</p>
+            ) : null}
           </div>
         </div>
-
-        {/* <div className="grid grid-cols-1 gap-4">
-          <div>
-            <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
-              Search This Case
-            </label>
-            <input
-              type="text"
-              placeholder="Search notes, documents, treatment, tasks, and more"
-              className="w-full rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
-            />
-          </div>
-        </div> */}
       </div>
     </header>
   );
