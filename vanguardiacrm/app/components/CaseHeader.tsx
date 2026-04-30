@@ -11,6 +11,7 @@ type CaseHeaderProps = {
     dateOfIncident: string;
     caseType: string;
     status: string;
+    phase?: string | null;
     phone: string;
     email: string;
     assignedTo: string;
@@ -47,7 +48,8 @@ function getPhaseStyles(phase: string) {
 }
 
 export default function CaseHeader({ caseData }: CaseHeaderProps) {
-  const [phase, setPhase] = useState(caseData.status || "Welcome");
+  const [phase, setPhase] = useState(caseData.phase || "Welcome");
+  const [editingPhase, setEditingPhase] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,6 +76,8 @@ export default function CaseHeader({ caseData }: CaseHeaderProps) {
       if (!res.ok) {
         throw new Error(result?.error || "Failed to update case phase");
       }
+
+      setEditingPhase(false);
     } catch (error) {
       setPhase(previousPhase);
       setError(
@@ -105,25 +109,48 @@ export default function CaseHeader({ caseData }: CaseHeaderProps) {
             ) : null}
           </div>
 
-          <div className="min-w-50">
+          <div className="min-w-55">
             <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
               Case Phase
             </label>
 
-            <select
-              value={phase}
-              disabled={saving}
-              onChange={(event) => handlePhaseChange(event.target.value)}
-              className={`w-full rounded-md border px-4 py-2 text-sm font-medium outline-none disabled:opacity-60 ${getPhaseStyles(
-                phase
-              )}`}
-            >
-              {casePhases.map((phaseOption) => (
-                <option key={phaseOption} value={phaseOption}>
-                  {phaseOption}
-                </option>
-              ))}
-            </select>
+            {!editingPhase ? (
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex rounded-md border px-4 py-2 text-sm font-medium ${getPhaseStyles(
+                    phase
+                  )}`}
+                >
+                  {phase}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setEditingPhase(true)}
+                  className="rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#555555] hover:bg-[#f7f7f7]"
+                >
+                  ⋯
+                </button>
+              </div>
+            ) : (
+              <select
+                value={phase}
+                disabled={saving}
+                onChange={(event) => handlePhaseChange(event.target.value)}
+                onBlur={() => {
+                  if (!saving) setEditingPhase(false);
+                }}
+                className={`w-full rounded-md border px-4 py-2 text-sm font-medium outline-none disabled:opacity-60 ${getPhaseStyles(
+                  phase
+                )}`}
+              >
+                {casePhases.map((phaseOption) => (
+                  <option key={phaseOption} value={phaseOption}>
+                    {phaseOption}
+                  </option>
+                ))}
+              </select>
+            )}
 
             {saving ? (
               <p className="mt-2 text-xs text-[#6b6b6b]">Saving...</p>
