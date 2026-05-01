@@ -73,29 +73,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: lead, error } = await supabaseAdmin
-      .from("leads")
-      .insert({
-        client_name: clientName,
-        phone,
-        email,
-        accident_date: accidentDate,
-        accident_type: accidentType,
-        accident_location: normalizeString(body.accident_location),
-        accident_description: normalizeString(body.accident_description),
-        screening_score:
-          typeof body.screening_score === "number"
-            ? body.screening_score
-            : null,
-        source_channel: "accidentintel",
-        source_medium: "api",
-        source_campaign:
-          normalizeString(body.source_campaign) ?? "accidentintel-live",
-        status: "New",
-        raw_payload: body,
-      })
-      .select()
-      .single();
+    const requestedSourceChannel = normalizeString(body.source_channel);
+
+const sourceChannel =
+  requestedSourceChannel === "whatsapp" ? "whatsapp" : "accidentintel";
+
+const defaultCampaign =
+  sourceChannel === "whatsapp" ? "whatsapp-intake" : "accidentintel-live";
+
+const { data: lead, error } = await supabaseAdmin
+  .from("leads")
+  .insert({
+    client_name: clientName,
+    phone,
+    email,
+    accident_date: accidentDate,
+    accident_type: accidentType,
+    accident_location: normalizeString(body.accident_location),
+    accident_description: normalizeString(body.accident_description),
+
+    osint_report_id: normalizeString(body.osint_report_id),
+
+    screening_score:
+      typeof body.screening_score === "number"
+        ? body.screening_score
+        : null,
+
+    source_channel: sourceChannel,
+    source_medium: "api",
+    source_campaign:
+      normalizeString(body.source_campaign) ?? defaultCampaign,
+
+    status: "New",
+    raw_payload: body,
+  })
+  .select()
+  .single();
 
     if (error || !lead) {
       return NextResponse.json(

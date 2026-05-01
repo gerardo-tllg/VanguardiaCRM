@@ -6,10 +6,19 @@ import {
   formatCampaign,
 } from "@/lib/formatters/source";
 
+type ReportsPageProps = {
+  searchParams?: Promise<{
+    start?: string;
+    end?: string;
+    campaign?: string;
+  }>;
+};
+
 type LeadRow = {
   id: string;
   source_channel: string | null;
   source_campaign: string | null;
+  created_at: string;
 };
 
 type CaseRow = {
@@ -32,11 +41,33 @@ function normalize(value: string | null | undefined, fallback: string) {
   return value && value.trim() ? value.trim() : fallback;
 }
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: ReportsPageProps) {
+  const params = (await searchParams) ?? {};
+
+  const start = params.start;
+  const end = params.end;
+  const campaign = params.campaign;
+
+  let leadsQuery = supabaseAdmin
+    .from("leads")
+    .select("id, source_channel, source_campaign, created_at");
+
+  if (start) {
+    leadsQuery = leadsQuery.gte("created_at", start);
+  }
+
+  if (end) {
+    leadsQuery = leadsQuery.lte("created_at", end);
+  }
+
+  if (campaign) {
+    leadsQuery = leadsQuery.eq("source_campaign", campaign);
+  }
+
   const [{ data: leads }, { data: cases }] = await Promise.all([
-    supabaseAdmin
-      .from("leads")
-      .select("id, source_channel, source_campaign"),
+    leadsQuery,
     supabaseAdmin
       .from("cases")
       .select("id, lead_id, status, phase"),
@@ -45,10 +76,15 @@ export default async function ReportsPage() {
   const leadRows = (leads ?? []) as LeadRow[];
   const caseRows = (cases ?? []) as CaseRow[];
 
+  const filteredLeadIds = new Set(leadRows.map((lead) => lead.id));
+
   const convertedLeadIds = new Set(
     caseRows
       .map((caseItem) => caseItem.lead_id)
-      .filter((value): value is string => Boolean(value))
+      .filter(
+        (value): value is string =>
+          Boolean(value) && filteredLeadIds.has(value)
+      )
   );
 
   const totalLeads = leadRows.length;
@@ -107,6 +143,8 @@ export default async function ReportsPage() {
     .map(([phase, count]) => ({ phase, count }))
     .sort((a, b) => b.count - a.count);
 
+  const hasActiveFilters = Boolean(start || end || campaign);
+
   return (
     <>
       <div className="mb-6">
@@ -115,6 +153,70 @@ export default async function ReportsPage() {
           Lead conversion, source performance, and case pipeline reporting.
         </p>
       </div>
+
+      <form
+        action="/reports"
+        className="mb-6 rounded-xl border border-[#e5e5e5] bg-white p-5"
+      >
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
+              Start Date
+            </label>
+            <input
+              type="date"
+              name="start"
+              defaultValue={start ?? ""}
+              className="rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
+              End Date
+            </label>
+            <input
+              type="date"
+              name="end"
+              defaultValue={end ?? ""}
+              className="rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
+            />
+          </div>
+
+          <div className="min-w-70">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
+              Campaign
+            </label>
+            <input
+              type="text"
+              name="campaign"
+              defaultValue={campaign ?? ""}
+              placeholder="pi_mcallen_2026"
+              className="w-full rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08]"
+          >
+            Apply Filters
+          </button>
+
+          <a
+            href="/reports"
+            className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+          >
+            Reset
+          </a>
+        </div>
+
+        {hasActiveFilters ? (
+          <div className="mt-4 text-sm text-[#6b6b6b]">
+            Showing filtered report data.
+          </div>
+        ) : null}
+      </form>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
@@ -144,6 +246,9 @@ export default async function ReportsPage() {
           <h2 className="text-2xl font-semibold text-[#2b2b2b]">
             Lead Conversion by Source
           </h2>
+          <p className="mt-2 text-sm text-[#6b6b6b]">
+            Tracks which source channels and campaigns are producing actual cases.
+          </p>
         </div>
 
         <div className="overflow-x-auto">
@@ -212,20 +317,29 @@ export default async function ReportsPage() {
           <h2 className="text-2xl font-semibold text-[#2b2b2b]">
             Case Pipeline
           </h2>
+          <p className="mt-2 text-sm text-[#6b6b6b]">
+            Current cases grouped by phase.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
-          {phaseRows.map((row) => (
-            <div
-              key={row.phase}
-              className="rounded-xl border border-[#eeeeee] bg-[#fafafa] p-5"
-            >
-              <div className="text-sm text-[#6b6b6b]">{row.phase}</div>
-              <div className="mt-2 text-2xl font-bold text-[#2b2b2b]">
-                {row.count}
+          {phaseRows.length > 0 ? (
+            phaseRows.map((row) => (
+              <div
+                key={row.phase}
+                className="rounded-xl border border-[#eeeeee] bg-[#fafafa] p-5"
+              >
+                <div className="text-sm text-[#6b6b6b]">{row.phase}</div>
+                <div className="mt-2 text-2xl font-bold text-[#2b2b2b]">
+                  {row.count}
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="rounded-xl border border-[#eeeeee] bg-[#fafafa] p-5 text-sm text-[#6b6b6b]">
+              No case pipeline data found.
             </div>
-          ))}
+          )}
         </div>
       </div>
     </>
