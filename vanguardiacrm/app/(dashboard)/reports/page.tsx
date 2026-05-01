@@ -43,35 +43,40 @@ function normalize(value: string | null | undefined, fallback: string) {
 
 export default async function ReportsPage({
   searchParams,
-}: ReportsPageProps) {
-  const params = (await searchParams) ?? {};
+}: {
+  searchParams?: {
+    start?: string;
+    end?: string;
+    campaign?: string;
+  };
+}) {
 
-  const start = params.start;
-  const end = params.end;
-  const campaign = params.campaign;
+  const start = searchParams?.start;
+  const end = searchParams?.end;
+  const campaign = searchParams?.campaign;
 
   let leadsQuery = supabaseAdmin
-    .from("leads")
-    .select("id, source_channel, source_campaign, created_at");
+  .from("leads")
+  .select("id, source_channel, source_campaign, created_at");
 
-  if (start) {
-    leadsQuery = leadsQuery.gte("created_at", start);
-  }
+if (start) {
+  leadsQuery = leadsQuery.gte("created_at", start);
+}
 
-  if (end) {
-    leadsQuery = leadsQuery.lte("created_at", end);
-  }
+if (end) {
+  leadsQuery = leadsQuery.lte("created_at", end);
+}
 
-  if (campaign) {
-    leadsQuery = leadsQuery.eq("source_campaign", campaign);
-  }
+if (campaign) {
+  leadsQuery = leadsQuery.eq("source_campaign", campaign);
+}
 
   const [{ data: leads }, { data: cases }] = await Promise.all([
-    leadsQuery,
-    supabaseAdmin
-      .from("cases")
-      .select("id, lead_id, status, phase"),
-  ]);
+  leadsQuery,
+  supabaseAdmin
+    .from("cases")
+    .select("id, lead_id, status, phase"),
+]);
 
   const leadRows = (leads ?? []) as LeadRow[];
   const caseRows = (cases ?? []) as CaseRow[];
@@ -154,69 +159,58 @@ export default async function ReportsPage({
         </p>
       </div>
 
-      <form
-        action="/reports"
-        className="mb-6 rounded-xl border border-[#e5e5e5] bg-white p-5"
-      >
-        <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
-              Start Date
-            </label>
-            <input
-              type="date"
-              name="start"
-              defaultValue={start ?? ""}
-              className="rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
-            />
-          </div>
+      <form className="mt-6 flex flex-wrap items-end gap-3" action="/reports">
+  <div>
+    <label className="mb-1 block text-xs font-medium uppercase text-[#6b6b6b]">
+      Start Date
+    </label>
+    <input
+      type="date"
+      name="start"
+      defaultValue={start ?? ""}
+      className="rounded-md border px-3 py-2 text-sm"
+    />
+  </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
-              End Date
-            </label>
-            <input
-              type="date"
-              name="end"
-              defaultValue={end ?? ""}
-              className="rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
-            />
-          </div>
+  <div>
+    <label className="mb-1 block text-xs font-medium uppercase text-[#6b6b6b]">
+      End Date
+    </label>
+    <input
+      type="date"
+      name="end"
+      defaultValue={end ?? ""}
+      className="rounded-md border px-3 py-2 text-sm"
+    />
+  </div>
 
-          <div className="min-w-70">
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
-              Campaign
-            </label>
-            <input
-              type="text"
-              name="campaign"
-              defaultValue={campaign ?? ""}
-              placeholder="pi_mcallen_2026"
-              className="w-full rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
-            />
-          </div>
+  <div>
+    <label className="mb-1 block text-xs font-medium uppercase text-[#6b6b6b]">
+      Campaign
+    </label>
+    <input
+      type="text"
+      name="campaign"
+      defaultValue={campaign ?? ""}
+      placeholder="pi_mcallen_2026"
+      className="rounded-md border px-3 py-2 text-sm"
+    />
+  </div>
 
-          <button
-            type="submit"
-            className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08]"
-          >
-            Apply Filters
-          </button>
+  <button
+    type="submit"
+    className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm text-white"
+  >
+    Apply
+  </button>
 
-          <a
-            href="/reports"
-            className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
-          >
-            Reset
-          </a>
-        </div>
-
-        {hasActiveFilters ? (
-          <div className="mt-4 text-sm text-[#6b6b6b]">
-            Showing filtered report data.
-          </div>
-        ) : null}
-      </form>
+  <a
+    href="/reports"
+    className="rounded-md border px-4 py-2 text-sm"
+  >
+    Reset
+  </a>
+</form>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
