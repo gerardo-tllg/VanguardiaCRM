@@ -63,15 +63,29 @@ if (campaign) {
   leadsQuery = leadsQuery.eq("source_campaign", campaign);
 }
 
-  const [{ data: leads }, { data: cases }] = await Promise.all([
-  leadsQuery,
-  supabaseAdmin
-    .from("cases")
-    .select("id, lead_id, status, phase"),
-]);
+  const [{ data: leads }, { data: cases }, { data: campaignData }] =
+    await Promise.all([
+      leadsQuery,
+      supabaseAdmin
+        .from("cases")
+        .select("id, lead_id, status, phase"),
+      supabaseAdmin
+        .from("leads")
+        .select("source_campaign")
+        .not("source_campaign", "is", null)
+        .order("source_campaign", { ascending: true }),
+    ]);
 
   const leadRows = (leads ?? []) as LeadRow[];
   const caseRows = (cases ?? []) as CaseRow[];
+
+  const campaignOptions = Array.from(
+    new Set(
+      ((campaignData ?? []) as Array<{ source_campaign: string | null }>)
+        .map((row) => row.source_campaign)
+        .filter((value): value is string => Boolean(value?.trim()))
+    )
+  );
 
   const filteredLeadIds = new Set(leadRows.map((lead) => lead.id));
 
@@ -177,13 +191,18 @@ if (campaign) {
     <label className="mb-1 block text-xs font-medium uppercase text-[#6b6b6b]">
       Campaign
     </label>
-    <input
-      type="text"
+    <select
       name="campaign"
       defaultValue={campaign ?? ""}
-      placeholder="pi_mcallen_2026"
-      className="rounded-md border px-3 py-2 text-sm"
-    />
+      className="min-w-60 rounded-md border px-3 py-2 text-sm"
+    >
+      <option value="">All Campaigns</option>
+      {campaignOptions.map((campaignOption) => (
+        <option key={campaignOption} value={campaignOption}>
+          {formatCampaign(campaignOption)}
+        </option>
+      ))}
+    </select>
   </div>
 
   <button
