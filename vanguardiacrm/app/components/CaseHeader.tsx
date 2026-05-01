@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatCaseType } from "@/lib/formatters/caseType";
 import { formatPersonName } from "@/lib/formatters/name";
 
@@ -29,6 +29,10 @@ const casePhases = [
   "Closed",
 ];
 
+function getDisplayPhase(phase: string | null | undefined) {
+  return phase && casePhases.includes(phase) ? phase : "Welcome";
+}
+
 function getPhaseStyles(phase: string) {
   switch (phase) {
     case "Settlement":
@@ -48,10 +52,14 @@ function getPhaseStyles(phase: string) {
 }
 
 export default function CaseHeader({ caseData }: CaseHeaderProps) {
-  const [phase, setPhase] = useState(caseData.phase || "Welcome");
+  const [phase, setPhase] = useState(() => getDisplayPhase(caseData.phase));
   const [editingPhase, setEditingPhase] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPhase(getDisplayPhase(caseData.phase));
+  }, [caseData.phase]);
 
   async function handlePhaseChange(nextPhase: string) {
     const previousPhase = phase;
@@ -137,9 +145,6 @@ export default function CaseHeader({ caseData }: CaseHeaderProps) {
                 value={phase}
                 disabled={saving}
                 onChange={(event) => handlePhaseChange(event.target.value)}
-                onBlur={() => {
-                  if (!saving) setEditingPhase(false);
-                }}
                 className={`w-full rounded-md border px-4 py-2 text-sm font-medium outline-none disabled:opacity-60 ${getPhaseStyles(
                   phase
                 )}`}
