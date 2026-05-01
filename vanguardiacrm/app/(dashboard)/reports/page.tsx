@@ -42,7 +42,6 @@ export default async function ReportsPage({
     campaign?: string;
   };
 }) {
-
   const start = searchParams?.start;
   const end = searchParams?.end;
   const campaign = searchParams?.campaign;
@@ -162,7 +161,11 @@ if (campaign) {
         </p>
       </div>
 
-      <form className="mt-6 flex flex-wrap items-end gap-3" action="/reports">
+      <form
+  method="GET"
+  action="/reports"
+  className="mt-6 flex flex-wrap items-end gap-3"
+>
   <div>
     <label className="mb-1 block text-xs font-medium uppercase text-[#6b6b6b]">
       Start Date
