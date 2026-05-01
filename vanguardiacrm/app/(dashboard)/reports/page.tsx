@@ -42,9 +42,9 @@ export default async function ReportsPage({
     campaign?: string;
   };
 }) {
-  const start = searchParams?.start;
-  const end = searchParams?.end;
-  const campaign = searchParams?.campaign;
+  const start = searchParams?.start?.trim() || undefined;
+const end = searchParams?.end?.trim() || undefined;
+const campaign = searchParams?.campaign?.trim() || undefined;
 
   let leadsQuery = supabaseAdmin
   .from("leads")
