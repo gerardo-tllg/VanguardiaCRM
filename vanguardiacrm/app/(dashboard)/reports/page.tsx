@@ -6,14 +6,6 @@ import {
   formatCampaign,
 } from "@/lib/formatters/source";
 
-type ReportsPageProps = {
-  searchParams?: Promise<{
-    start?: string;
-    end?: string;
-    campaign?: string;
-  }>;
-};
-
 type LeadRow = {
   id: string;
   source_channel: string | null;
@@ -83,14 +75,13 @@ if (campaign) {
 
   const filteredLeadIds = new Set(leadRows.map((lead) => lead.id));
 
-  const convertedLeadIds = new Set(
-    caseRows
-      .map((caseItem) => caseItem.lead_id)
-      .filter(
-        (value): value is string =>
-          Boolean(value) && filteredLeadIds.has(value)
-      )
-  );
+  const convertedLeadIds = new Set<string>();
+
+  for (const caseItem of caseRows) {
+    if (typeof caseItem.lead_id === "string" && filteredLeadIds.has(caseItem.lead_id)) {
+      convertedLeadIds.add(caseItem.lead_id);
+    }
+  }
 
   const totalLeads = leadRows.length;
   const convertedCases = convertedLeadIds.size;
@@ -147,8 +138,6 @@ if (campaign) {
   const phaseRows = Array.from(phaseMap.entries())
     .map(([phase, count]) => ({ phase, count }))
     .sort((a, b) => b.count - a.count);
-
-  const hasActiveFilters = Boolean(start || end || campaign);
 
   return (
     <>
