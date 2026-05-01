@@ -68,36 +68,35 @@ export default async function ReportsPage({
     supabaseAdmin
       .from("leads")
       .select("source_campaign")
-      .not("source_campaign", "is", null),
+      .not("source_campaign", "is", null)
+      .order("source_campaign", { ascending: true }),
     supabaseAdmin
       .from("leads")
       .select("source_channel")
-      .not("source_channel", "is", null),
+      .not("source_channel", "is", null)
+      .order("source_channel", { ascending: true }),
   ]);
 
   const leadRows = (leads ?? []) as LeadRow[];
   const caseRows = (cases ?? []) as CaseRow[];
 
-  // ✅ Campaign options
   const campaignOptions = Array.from(
     new Set(
       ((campaignData ?? []) as Array<{ source_campaign: string | null }>)
         .map((row) => row.source_campaign)
-        .filter((v): v is string => Boolean(v?.trim()))
+        .filter((value): value is string => Boolean(value?.trim()))
     )
   );
 
-  // ✅ Source channel options
   const sourceOptions = Array.from(
     new Set(
       ((sourceData ?? []) as Array<{ source_channel: string | null }>)
         .map((row) => row.source_channel)
-        .filter((v): v is string => Boolean(v?.trim()))
+        .filter((value): value is string => Boolean(value?.trim()))
     )
   );
 
   const filteredLeadIds = new Set(leadRows.map((lead) => lead.id));
-
   const convertedLeadIds = new Set<string>();
 
   for (const caseItem of caseRows) {
@@ -129,8 +128,7 @@ export default async function ReportsPage({
     const key = `${sourceChannel}::${sourceCampaign}`;
 
     const current =
-      sourceMap.get(key) ??
-      {
+      sourceMap.get(key) ?? {
         source_channel: sourceChannel,
         source_campaign: sourceCampaign,
         total_leads: 0,
@@ -146,7 +144,13 @@ export default async function ReportsPage({
     sourceMap.set(key, current);
   }
 
-  const sourceRows = Array.from(sourceMap.values());
+  const sourceRows = Array.from(sourceMap.values()).sort((a, b) => {
+    if (b.converted_cases !== a.converted_cases) {
+      return b.converted_cases - a.converted_cases;
+    }
+
+    return b.total_leads - a.total_leads;
+  });
 
   const phaseMap = new Map<string, number>();
 
@@ -155,43 +159,225 @@ export default async function ReportsPage({
     phaseMap.set(phase, (phaseMap.get(phase) ?? 0) + 1);
   }
 
-  const phaseRows = Array.from(phaseMap.entries()).map(([phase, count]) => ({
-    phase,
-    count,
-  }));
+  const phaseRows = Array.from(phaseMap.entries())
+    .map(([phase, count]) => ({ phase, count }))
+    .sort((a, b) => b.count - a.count);
 
   return (
     <>
-      <h1 className="text-4xl font-bold mb-4">Reports</h1>
+      <div className="mb-6">
+        <h1 className="text-4xl font-bold text-[#2b2b2b]">Reports</h1>
+        <p className="mt-2 text-[#6b6b6b]">
+          Lead conversion, source performance, and case pipeline reporting.
+        </p>
+      </div>
 
-      <form method="GET" className="flex gap-3 mb-6">
-        <input type="date" name="start" defaultValue={start ?? ""} />
-        <input type="date" name="end" defaultValue={end ?? ""} />
+      <form
+        method="GET"
+        action="/reports"
+        className="mb-6 rounded-xl border border-[#e5e5e5] bg-white p-5"
+      >
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
+              Start Date
+            </label>
+            <input
+              type="date"
+              name="start"
+              defaultValue={start ?? ""}
+              className="rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
+            />
+          </div>
 
-        <select name="channel" defaultValue={channel ?? ""}>
-          <option value="">All Sources</option>
-          {sourceOptions.map((s) => (
-            <option key={s} value={s}>
-              {formatSourceChannel(s)}
-            </option>
-          ))}
-        </select>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
+              End Date
+            </label>
+            <input
+              type="date"
+              name="end"
+              defaultValue={end ?? ""}
+              className="rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
+            />
+          </div>
 
-        <select name="campaign" defaultValue={campaign ?? ""}>
-          <option value="">All Campaigns</option>
-          {campaignOptions.map((c) => (
-            <option key={c} value={c}>
-              {formatCampaign(c)}
-            </option>
-          ))}
-        </select>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
+              Source
+            </label>
+            <select
+              name="channel"
+              defaultValue={channel ?? ""}
+              className="min-w-45 rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
+            >
+              <option value="">All Sources</option>
+              {sourceOptions.map((sourceOption) => (
+                <option key={sourceOption} value={sourceOption}>
+                  {formatSourceChannel(sourceOption)}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <button type="submit">Apply</button>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[#6b6b6b]">
+              Campaign
+            </label>
+            <select
+              name="campaign"
+              defaultValue={campaign ?? ""}
+              className="min-w-60 rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
+            >
+              <option value="">All Campaigns</option>
+              {campaignOptions.map((campaignOption) => (
+                <option key={campaignOption} value={campaignOption}>
+                  {formatCampaign(campaignOption)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            className="rounded-md bg-[#4b0a06] px-4 py-2 text-sm font-medium text-white hover:bg-[#5f0d08]"
+          >
+            Apply Filters
+          </button>
+
+          <a
+            href="/reports"
+            className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+          >
+            Reset
+          </a>
+        </div>
       </form>
 
-      <div>Total Leads: {totalLeads}</div>
-      <div>Converted Cases: {convertedCases}</div>
-      <div>Conversion Rate: {formatPercent(conversionRate)}</div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
+          <div className="text-sm text-[#6b6b6b]">Total Leads</div>
+          <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
+            {totalLeads}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
+          <div className="text-sm text-[#6b6b6b]">Converted Cases</div>
+          <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
+            {convertedCases}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
+          <div className="text-sm text-[#6b6b6b]">Conversion Rate</div>
+          <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
+            {formatPercent(conversionRate)}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-[#e5e5e5] bg-white">
+        <div className="border-b border-[#e5e5e5] p-6">
+          <h2 className="text-2xl font-semibold text-[#2b2b2b]">
+            Lead Conversion by Source
+          </h2>
+          <p className="mt-2 text-sm text-[#6b6b6b]">
+            Tracks which source channels and campaigns are producing actual cases.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="border-b border-[#e5e5e5] bg-[#fafafa] text-left text-[#2b2b2b]">
+              <tr>
+                <th className="px-5 py-4 font-semibold">Source Channel</th>
+                <th className="px-5 py-4 font-semibold">Campaign</th>
+                <th className="px-5 py-4 font-semibold">Total Leads</th>
+                <th className="px-5 py-4 font-semibold">Converted Cases</th>
+                <th className="px-5 py-4 font-semibold">Conversion Rate</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {sourceRows.length > 0 ? (
+                sourceRows.map((row) => {
+                  const rate = getRate(row.converted_cases, row.total_leads);
+
+                  return (
+                    <tr
+                      key={`${row.source_channel}-${row.source_campaign}`}
+                      className="border-b border-[#eeeeee] last:border-b-0"
+                    >
+                      <td className="px-5 py-4 font-medium text-[#2b2b2b]">
+                        {formatSourceChannel(row.source_channel)}
+                      </td>
+
+                      <td className="px-5 py-4 text-[#555555]">
+                        {formatCampaign(row.source_campaign)}
+                      </td>
+
+                      <td className="px-5 py-4 text-[#555555]">
+                        {row.total_leads}
+                      </td>
+
+                      <td className="px-5 py-4 text-[#555555]">
+                        {row.converted_cases}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span className="inline-flex rounded-full border border-[#e4c9c4] bg-[#fdf6f5] px-3 py-1 text-xs font-medium text-[#4b0a06]">
+                          {formatPercent(rate)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-5 py-8 text-center text-[#6b6b6b]"
+                  >
+                    No lead source data found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-[#e5e5e5] bg-white">
+        <div className="border-b border-[#e5e5e5] p-6">
+          <h2 className="text-2xl font-semibold text-[#2b2b2b]">
+            Case Pipeline
+          </h2>
+          <p className="mt-2 text-sm text-[#6b6b6b]">
+            Current cases grouped by phase.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
+          {phaseRows.length > 0 ? (
+            phaseRows.map((row) => (
+              <div
+                key={row.phase}
+                className="rounded-xl border border-[#eeeeee] bg-[#fafafa] p-5"
+              >
+                <div className="text-sm text-[#6b6b6b]">{row.phase}</div>
+                <div className="mt-2 text-2xl font-bold text-[#2b2b2b]">
+                  {row.count}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-xl border border-[#eeeeee] bg-[#fafafa] p-5 text-sm text-[#6b6b6b]">
+              No case pipeline data found.
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
 }
