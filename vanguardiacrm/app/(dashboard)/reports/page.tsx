@@ -16,6 +16,8 @@ type LeadRow = {
 type CaseRow = {
   id: string;
   lead_id: string | null;
+  source_channel: string | null;
+  source_campaign: string | null;
   status: string | null;
   phase: string | null;
 };
@@ -73,7 +75,7 @@ export default async function ReportsPage({
     { data: sourceData },
   ] = await Promise.all([
     leadsQuery,
-    supabaseAdmin.from("cases").select("id, lead_id, status, phase"),
+    supabaseAdmin.from("cases").select("id, lead_id, source_channel, source_campaign, status, phase"),
     supabaseAdmin
       .from("leads")
       .select("source_campaign")
@@ -103,21 +105,19 @@ export default async function ReportsPage({
     )
   );
 
-  const filteredLeadIds = new Set(leadRows.map((lead) => lead.id));
-  const convertedLeadIds = new Set<string>();
+  const filteredCaseRows = caseRows.filter((caseItem) => {
+  const caseChannel = normalize(caseItem.source_channel, "unknown");
+  const caseCampaign = normalize(caseItem.source_campaign, "unknown");
 
-  for (const caseItem of caseRows) {
-    if (
-      typeof caseItem.lead_id === "string" &&
-      filteredLeadIds.has(caseItem.lead_id)
-    ) {
-      convertedLeadIds.add(caseItem.lead_id);
-    }
-  }
+  if (channel && caseChannel !== channel) return false;
+  if (campaign && caseCampaign !== campaign) return false;
 
-  const totalLeads = leadRows.length;
-  const convertedCases = convertedLeadIds.size;
-  const conversionRate = getRate(convertedCases, totalLeads);
+  return true;
+});
+
+const totalLeads = leadRows.length;
+const convertedCases = filteredCaseRows.length;
+const conversionRate = getRate(convertedCases, totalLeads);
 
   const sourceMap = new Map<
     string,
@@ -144,9 +144,12 @@ export default async function ReportsPage({
 
     current.total_leads += 1;
 
-    if (convertedLeadIds.has(lead.id)) {
-      current.converted_cases += 1;
-    }
+    current.converted_cases = filteredCaseRows.filter((caseItem) => {
+  const caseChannel = normalize(caseItem.source_channel, "unknown");
+  const caseCampaign = normalize(caseItem.source_campaign, "unknown");
+
+  return caseChannel === sourceChannel && caseCampaign === sourceCampaign;
+}).length;
 
     sourceMap.set(key, current);
   }
