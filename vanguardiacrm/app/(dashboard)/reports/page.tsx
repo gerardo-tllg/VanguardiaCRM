@@ -29,6 +29,14 @@ type ReportsSearchParams = {
   campaign?: string | string[];
 };
 
+type SourceRow = {
+  source_channel: string;
+  source_campaign: string;
+  total_leads: number;
+  true_conversions: number;
+  attributed_cases: number;
+};
+
 function getParam(value: string | string[] | undefined): string | undefined {
   const raw = Array.isArray(value) ? value[0] : value;
   return raw?.trim() || undefined;
@@ -63,10 +71,27 @@ export default async function ReportsPage({
     .from("leads")
     .select("id, source_channel, source_campaign, created_at");
 
-  if (start) leadsQuery = leadsQuery.gte("created_at", start);
-  if (end) leadsQuery = leadsQuery.lte("created_at", end);
-  if (channel) leadsQuery = leadsQuery.eq("source_channel", channel);
-  if (campaign) leadsQuery = leadsQuery.eq("source_campaign", campaign);
+  let casesQuery = supabaseAdmin
+    .from("cases")
+    .select("id, lead_id, source_channel, source_campaign, status, phase");
+
+  if (start) {
+    leadsQuery = leadsQuery.gte("created_at", start);
+  }
+
+  if (end) {
+    leadsQuery = leadsQuery.lte("created_at", end);
+  }
+
+  if (channel) {
+    leadsQuery = leadsQuery.eq("source_channel", channel);
+    casesQuery = casesQuery.eq("source_channel", channel);
+  }
+
+  if (campaign) {
+    leadsQuery = leadsQuery.eq("source_campaign", campaign);
+    casesQuery = casesQuery.eq("source_campaign", campaign);
+  }
 
   const [
     { data: leads },
@@ -75,15 +100,17 @@ export default async function ReportsPage({
     { data: sourceData },
   ] = await Promise.all([
     leadsQuery,
-    supabaseAdmin.from("cases").select("id, lead_id, source_channel, source_campaign, status, phase"),
+    casesQuery,
     supabaseAdmin
       .from("leads")
       .select("source_campaign")
-      .not("source_campaign", "is", null),
+      .not("source_campaign", "is", null)
+      .order("source_campaign", { ascending: true }),
     supabaseAdmin
       .from("leads")
       .select("source_channel")
-      .not("source_channel", "is", null),
+      .not("source_channel", "is", null)
+      .order("source_channel", { ascending: true }),
   ]);
 
   const leadRows = (leads ?? []) as LeadRow[];
@@ -105,30 +132,24 @@ export default async function ReportsPage({
     )
   );
 
-  const filteredCaseRows = caseRows.filter((caseItem) => {
-  const caseChannel = normalize(caseItem.source_channel, "unknown");
-  const caseCampaign = normalize(caseItem.source_campaign, "unknown");
+  const filteredLeadIds = new Set(leadRows.map((lead) => lead.id));
+  const trueConvertedLeadIds = new Set<string>();
 
-  if (channel && caseChannel !== channel) return false;
-  if (campaign && caseCampaign !== campaign) return false;
-
-  return true;
-});
-
-const totalLeads = leadRows.length;
-const convertedCases = filteredCaseRows.length;
-const safeConverted = Math.min(convertedCases, totalLeads);
-const conversionRate = getRate(safeConverted, totalLeads);
-
-  const sourceMap = new Map<
-    string,
-    {
-      source_channel: string;
-      source_campaign: string;
-      total_leads: number;
-      converted_cases: number;
+  for (const caseItem of caseRows) {
+    if (
+      typeof caseItem.lead_id === "string" &&
+      filteredLeadIds.has(caseItem.lead_id)
+    ) {
+      trueConvertedLeadIds.add(caseItem.lead_id);
     }
-  >();
+  }
+
+  const totalLeads = leadRows.length;
+  const trueConversions = trueConvertedLeadIds.size;
+  const attributedCases = caseRows.length;
+  const trueConversionRate = getRate(trueConversions, totalLeads);
+
+  const sourceMap = new Map<string, SourceRow>();
 
   for (const lead of leadRows) {
     const sourceChannel = normalize(lead.source_channel, "unknown");
@@ -136,28 +157,53 @@ const conversionRate = getRate(safeConverted, totalLeads);
     const key = `${sourceChannel}::${sourceCampaign}`;
 
     const current =
-      sourceMap.get(key) ?? {
+      sourceMap.get(key) ??
+      {
         source_channel: sourceChannel,
         source_campaign: sourceCampaign,
         total_leads: 0,
-        converted_cases: 0,
+        true_conversions: 0,
+        attributed_cases: 0,
       };
 
     current.total_leads += 1;
+    sourceMap.set(key, current);
+  }
 
-    current.converted_cases = filteredCaseRows.filter((caseItem) => {
-  const caseChannel = normalize(caseItem.source_channel, "unknown");
-  const caseCampaign = normalize(caseItem.source_campaign, "unknown");
+  for (const caseItem of caseRows) {
+    const sourceChannel = normalize(caseItem.source_channel, "unknown");
+    const sourceCampaign = normalize(caseItem.source_campaign, "unknown");
+    const key = `${sourceChannel}::${sourceCampaign}`;
 
-  return caseChannel === sourceChannel && caseCampaign === sourceCampaign;
-}).length;
+    const current =
+      sourceMap.get(key) ??
+      {
+        source_channel: sourceChannel,
+        source_campaign: sourceCampaign,
+        total_leads: 0,
+        true_conversions: 0,
+        attributed_cases: 0,
+      };
+
+    current.attributed_cases += 1;
+
+    if (
+      typeof caseItem.lead_id === "string" &&
+      filteredLeadIds.has(caseItem.lead_id)
+    ) {
+      current.true_conversions += 1;
+    }
 
     sourceMap.set(key, current);
   }
 
   const sourceRows = Array.from(sourceMap.values()).sort((a, b) => {
-    if (b.converted_cases !== a.converted_cases) {
-      return b.converted_cases - a.converted_cases;
+    if (b.true_conversions !== a.true_conversions) {
+      return b.true_conversions - a.true_conversions;
+    }
+
+    if (b.attributed_cases !== a.attributed_cases) {
+      return b.attributed_cases - a.attributed_cases;
     }
 
     return b.total_leads - a.total_leads;
@@ -179,7 +225,7 @@ const conversionRate = getRate(safeConverted, totalLeads);
       <div className="mb-6">
         <h1 className="text-4xl font-bold text-[#2b2b2b]">Reports</h1>
         <p className="mt-2 text-[#6b6b6b]">
-          Lead conversion, source performance, and case pipeline reporting.
+          Lead conversion, source attribution, and case pipeline reporting.
         </p>
       </div>
 
@@ -277,33 +323,44 @@ const conversionRate = getRate(safeConverted, totalLeads);
         </div>
 
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-          <div className="text-sm text-[#6b6b6b]">Converted Cases</div>
+          <div className="text-sm text-[#6b6b6b]">True Conversions</div>
           <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
-            {convertedCases}
+            {trueConversions}
           </div>
           <p className="mt-3 text-sm text-[#8a8a8a]">
-            Filtered leads that became cases.
+            Filtered leads with a linked case.
           </p>
         </div>
 
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
           <div className="text-sm text-[#6b6b6b]">Conversion Rate</div>
           <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
-            {formatPercent(conversionRate)}
+            {formatPercent(trueConversionRate)}
           </div>
           <p className="mt-3 text-sm text-[#8a8a8a]">
-            Converted cases divided by filtered leads.
+            True conversions divided by filtered leads.
           </p>
         </div>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-[#e5e5e5] bg-white p-6">
+        <div className="text-sm text-[#6b6b6b]">Attributed Cases</div>
+        <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
+          {attributedCases}
+        </div>
+        <p className="mt-3 text-sm text-[#8a8a8a]">
+          Cases matching the selected source/campaign filters, regardless of
+          whether lead_id is populated.
+        </p>
       </div>
 
       <div className="mt-8 rounded-xl border border-[#e5e5e5] bg-white">
         <div className="border-b border-[#e5e5e5] p-6">
           <h2 className="text-2xl font-semibold text-[#2b2b2b]">
-            Lead Conversion by Source
+            Lead Conversion and Attribution by Source
           </h2>
           <p className="mt-2 text-sm text-[#6b6b6b]">
-            Tracks which source channels and campaigns are producing actual cases.
+            True conversions use lead_id. Attributed cases use source and campaign.
           </p>
         </div>
 
@@ -314,15 +371,16 @@ const conversionRate = getRate(safeConverted, totalLeads);
                 <th className="px-5 py-4 font-semibold">Source Channel</th>
                 <th className="px-5 py-4 font-semibold">Campaign</th>
                 <th className="px-5 py-4 font-semibold">Total Leads</th>
-                <th className="px-5 py-4 font-semibold">Converted Cases</th>
-                <th className="px-5 py-4 font-semibold">Conversion Rate</th>
+                <th className="px-5 py-4 font-semibold">True Conversions</th>
+                <th className="px-5 py-4 font-semibold">Attributed Cases</th>
+                <th className="px-5 py-4 font-semibold">True Conversion Rate</th>
               </tr>
             </thead>
 
             <tbody>
               {sourceRows.length > 0 ? (
                 sourceRows.map((row) => {
-                  const rate = getRate(row.converted_cases, row.total_leads);
+                  const rate = getRate(row.true_conversions, row.total_leads);
 
                   return (
                     <tr
@@ -342,7 +400,11 @@ const conversionRate = getRate(safeConverted, totalLeads);
                       </td>
 
                       <td className="px-5 py-4 text-[#555555]">
-                        {row.converted_cases}
+                        {row.true_conversions}
+                      </td>
+
+                      <td className="px-5 py-4 text-[#555555]">
+                        {row.attributed_cases}
                       </td>
 
                       <td className="px-5 py-4">
@@ -356,7 +418,7 @@ const conversionRate = getRate(safeConverted, totalLeads);
               ) : (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-5 py-8 text-center text-[#6b6b6b]"
                   >
                     No lead source data found.

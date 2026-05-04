@@ -44,38 +44,61 @@ type RawContact = {
 };
 
 function normalizeContactRows(rows: RawContact[]): ContactRow[] {
-  return rows.map((contact) => ({
-    id: contact.id,
-    first_name: contact.first_name,
-    middle_name: contact.middle_name,
-    last_name: contact.last_name,
-    full_name: contact.full_name,
-    email: contact.email,
-    phone: contact.phone,
-    contact_type: contact.contact_type,
-    company: contact.company,
-    city: contact.city,
-    status: contact.status,
-    contact_cases: (contact.contact_cases ?? []).map((link) => {
-      const caseRecord = Array.isArray(link.cases) ? link.cases[0] ?? null : link.cases;
+  return rows.map((contact) => {
+    const linkedCases = (contact.contact_cases ?? [])
+      .map((link) => {
+        const caseRecord = Array.isArray(link.cases)
+          ? link.cases[0] ?? null
+          : link.cases;
 
-      return {
-        id: link.id,
-        relationship: link.relationship,
-        case: caseRecord
-          ? {
-              id: caseRecord.id,
-              case_number: caseRecord.case_number,
-              client_name: caseRecord.client_name,
-              case_type: caseRecord.case_type,
-              status: caseRecord.status,
-              phase: caseRecord.phase ?? "Welcome",
-              created_at: caseRecord.created_at,
-            }
-          : null,
-      };
-    }),
-  }));
+        return caseRecord;
+      })
+      .filter(Boolean);
+
+    const hasOpenCase = linkedCases.some(
+      (c) => c?.status && c.status !== "Closed"
+    );
+
+    const computedStatus = hasOpenCase ? "Active" : "Closed";
+
+    return {
+      id: contact.id,
+      first_name: contact.first_name,
+      middle_name: contact.middle_name,
+      last_name: contact.last_name,
+      full_name: contact.full_name,
+      email: contact.email,
+      phone: contact.phone,
+      contact_type: contact.contact_type,
+      company: contact.company,
+      city: contact.city,
+
+      // 👇 THIS is the fix
+      status: computedStatus,
+
+      contact_cases: (contact.contact_cases ?? []).map((link) => {
+        const caseRecord = Array.isArray(link.cases)
+          ? link.cases[0] ?? null
+          : link.cases;
+
+        return {
+          id: link.id,
+          relationship: link.relationship,
+          case: caseRecord
+            ? {
+                id: caseRecord.id,
+                case_number: caseRecord.case_number,
+                client_name: caseRecord.client_name,
+                case_type: caseRecord.case_type,
+                status: caseRecord.status,
+                phase: caseRecord.phase ?? "Welcome",
+                created_at: caseRecord.created_at,
+              }
+            : null,
+        };
+      }),
+    };
+  });
 }
 
 export default async function ContactsPage() {
