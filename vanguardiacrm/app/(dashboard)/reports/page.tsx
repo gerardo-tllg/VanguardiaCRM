@@ -117,7 +117,8 @@ export default async function ReportsPage({
 
 const totalLeads = leadRows.length;
 const convertedCases = filteredCaseRows.length;
-const conversionRate = getRate(convertedCases, totalLeads);
+const safeConverted = Math.min(convertedCases, totalLeads);
+const conversionRate = getRate(safeConverted, totalLeads);
 
   const sourceMap = new Map<
     string,
