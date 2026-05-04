@@ -91,6 +91,7 @@ export default async function ContactsPage() {
     email,
     phone,
     contact_type,
+    status,
     contact_cases (
       id,
       relationship,

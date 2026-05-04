@@ -95,6 +95,9 @@ export default function CaseHeader({ caseData }: CaseHeaderProps) {
       setSaving(false);
     }
   }
+  async function handleCloseCase() {
+  await handlePhaseChange("Closed");
+}
 
   return (
     <header className="border-b border-[#e5e5e5] bg-white px-6 py-5">
@@ -160,6 +163,14 @@ export default function CaseHeader({ caseData }: CaseHeaderProps) {
             {saving ? (
               <p className="mt-2 text-xs text-[#6b6b6b]">Saving...</p>
             ) : null}
+            <button
+  type="button"
+  onClick={() => handlePhaseChange("Closed")}
+  disabled={saving || phase === "Closed"}
+  className="mt-3 w-full rounded-md border border-[#d9d9d9] bg-white px-3 py-2 text-xs font-medium text-[#2b2b2b] hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Close Case
+</button>
           </div>
         </div>
       </div>
