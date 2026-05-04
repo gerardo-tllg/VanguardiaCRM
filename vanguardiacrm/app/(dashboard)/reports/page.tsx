@@ -323,7 +323,7 @@ export default async function ReportsPage({
         </div>
 
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6">
-          <div className="text-sm text-[#6b6b6b]">True Conversions</div>
+          <div className="text-sm text-[#6b6b6b]">Lead Conversion</div>
           <div className="mt-2 text-3xl font-bold text-[#2b2b2b]">
             {trueConversions}
           </div>
