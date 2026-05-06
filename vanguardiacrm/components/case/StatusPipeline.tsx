@@ -16,6 +16,7 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
   const [selectedPhase, setSelectedPhase] = useState<CaseStatus | null>(null)
   const [checkedTriggers, setCheckedTriggers] = useState<Set<string>>(new Set())
   const [advancing, setAdvancing] = useState(false)
+  const [confirmAdvance, setConfirmAdvance] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const supabase = useMemo(() => createClient(), [])
@@ -33,11 +34,8 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
   function toggleTrigger(key: string) {
     setCheckedTriggers((prev) => {
       const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-      }
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
@@ -47,6 +45,7 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
 
     setAdvancing(true)
     setError(null)
+    setConfirmAdvance(false)
 
     const { error: dbError } = await supabase
       .from('cases')
@@ -86,8 +85,9 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
             <div key={phase.status} className="flex items-center">
               <button
                 type="button"
+                title="Click to view triggers"
                 onClick={() => handlePhaseClick(phase.status)}
-                className={`flex min-w-[84px] flex-col items-center gap-1.5 rounded-lg px-2 py-2 transition-colors ${
+                className={`flex min-w-[84px] cursor-pointer flex-col items-center gap-1.5 rounded-lg px-2 py-2 transition-colors ${
                   isSelected ? 'bg-[#eef4ff]' : 'hover:bg-[#f7f7f7]'
                 }`}
               >
@@ -101,18 +101,8 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
                   }`}
                 >
                   {isCompleted ? (
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
                     <span>{index + 1}</span>
@@ -149,7 +139,7 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
         <div className="mt-4 rounded-lg border border-[#e5e5e5] bg-[#f9f9f9] p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-[#2b2b2b]">
-              {selectedPipelinePhase.label} — Triggers
+              {selectedPipelinePhase.label}: Triggers
             </h3>
             <button
               type="button"
@@ -162,10 +152,7 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
 
           <div className="mb-4 space-y-2">
             {selectedPipelinePhase.triggers.map((trigger) => (
-              <label
-                key={trigger.key}
-                className="flex cursor-pointer items-center gap-2"
-              >
+              <label key={trigger.key} className="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
                   checked={checkedTriggers.has(trigger.key)}
@@ -193,26 +180,49 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
       )}
 
       {/* Advance button row */}
-      <div className="mt-5 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={advanceToNextPhase}
-          disabled={advancing || !nextPhase}
-          className="rounded-md bg-[#1d4f91] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1a4580] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {advancing
-            ? 'Advancing...'
-            : nextPhase
-              ? `Advance to ${nextPhase.label}`
-              : 'Final Phase Reached'}
-        </button>
+      <div className="mt-5">
+        {confirmAdvance && nextPhase ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3">
+            <p className="text-sm text-[#8a5a00]">
+              Advance case to <span className="font-semibold">{nextPhase.label}</span>? This cannot be undone.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={advanceToNextPhase}
+                disabled={advancing}
+                className="rounded-md bg-[#1d4f91] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a4580] disabled:opacity-50"
+              >
+                {advancing ? 'Advancing...' : 'Confirm'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmAdvance(false)}
+                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => { setError(null); setConfirmAdvance(true) }}
+              disabled={!nextPhase}
+              className="rounded-md bg-[#1d4f91] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1a4580] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {nextPhase ? `Advance to ${nextPhase.label}` : 'Final Phase Reached'}
+            </button>
 
-        <span className="text-sm text-[#6b6b6b]">
-          Current:{' '}
-          <span className="font-medium text-[#2b2b2b]">
-            {PIPELINE[currentIndex]?.label ?? localStatus}
-          </span>
-        </span>
+            <span className="text-sm text-[#6b6b6b]">
+              Current:{' '}
+              <span className="font-medium text-[#2b2b2b]">
+                {PIPELINE[currentIndex]?.label ?? localStatus}
+              </span>
+            </span>
+          </div>
+        )}
       </div>
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

@@ -77,6 +77,10 @@ function getStatusColors(value: string) {
   }
 }
 
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 const MRI_OPTIONS: { value: MRIStatus; label: string }[] = [
   { value: 'none',      label: 'None'      },
   { value: 'ordered',   label: 'Ordered'   },
@@ -119,7 +123,7 @@ function ReadField({ label, value }: { label: string; value: string | null | und
 }
 
 function ReadNotes({ value }: { value: string }) {
-  if (!value) return <p className="text-sm italic text-[#b9b9b9]">No notes added</p>
+  if (!value) return <p className="text-sm italic text-[#b9b9b9]">No notes added.</p>
   return (
     <p className="rounded-md bg-[#f9f9f9] px-3 py-2 text-sm leading-relaxed text-[#2b2b2b] whitespace-pre-wrap">
       {value}
@@ -232,40 +236,53 @@ function EditTextField({ label, value, onChange, type = 'text', placeholder }: {
 
 // ── Section wrapper ───────────────────────────────────────────────────────────
 
-function Section({ title, isEditing, onEdit, canEdit, children }: {
+function Section({ title, isEditing, onEdit, canEdit, isDirty, children }: {
   title: string
   isEditing: boolean
   onEdit: () => void
   canEdit: boolean
+  isDirty?: boolean
   children: React.ReactNode
 }) {
   return (
     <div className="rounded-xl border border-[#e5e5e5] bg-white p-5">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-[#9b9b9b]">{title}</h3>
-        {!isEditing && (
-          <button
-            type="button"
-            onClick={onEdit}
-            disabled={!canEdit}
-            className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1 text-xs font-medium text-[#555555] hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Edit
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {isEditing && isDirty && (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              Unsaved changes
+            </span>
+          )}
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={!canEdit}
+              className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1 text-xs font-medium text-[#555555] hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Edit
+            </button>
+          )}
+        </div>
       </div>
       <div className="space-y-4">{children}</div>
     </div>
   )
 }
 
-function EditActions({ onSave, onCancel, saving, error }: {
-  onSave: () => void; onCancel: () => void; saving: boolean; error: string | null
+function EditActions({ onSave, onCancel, saving, error, lastSavedAt }: {
+  onSave: () => void
+  onCancel: () => void
+  saving: boolean
+  error: string | null
+  lastSavedAt: Date | null
 }) {
   return (
     <div className="mt-5 border-t border-[#f3f3f3] pt-4">
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={onSave}
@@ -281,6 +298,9 @@ function EditActions({ onSave, onCancel, saving, error }: {
         >
           Cancel
         </button>
+        {lastSavedAt && (
+          <span className="text-xs text-[#9b9b9b]">Last saved: {formatTime(lastSavedAt)}</span>
+        )}
       </div>
     </div>
   )
@@ -298,7 +318,7 @@ export default function InjuryStatusTab({ caseId }: Props) {
   const [editingSection, setEditingSection] = useState<EditSection>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -336,6 +356,8 @@ export default function InjuryStatusTab({ caseId }: Props) {
   function setText(key: keyof InjuryForm) {
     return (val: string) => setForm((prev) => ({ ...prev, [key]: val }))
   }
+
+  const isDirty = editingSection !== null && JSON.stringify(form) !== JSON.stringify(savedForm)
 
   async function saveSection() {
     setSaving(true)
@@ -380,8 +402,7 @@ export default function InjuryStatusTab({ caseId }: Props) {
     setExistingId(data.id)
     setSavedForm(form)
     setEditingSection(null)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    setLastSavedAt(new Date())
     setSaving(false)
   }
 
@@ -391,16 +412,19 @@ export default function InjuryStatusTab({ caseId }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-[#2b2b2b]">Injury Status</h2>
-          <p className="text-sm text-[#6b6b6b]">Changes are not auto-saved</p>
-        </div>
-        {saved && <span className="text-sm font-medium text-[#1f7a4d]">Saved</span>}
+      <div>
+        <h2 className="text-lg font-semibold text-[#2b2b2b]">Injury Status</h2>
+        <p className="text-sm text-[#6b6b6b]">Changes are not auto-saved.</p>
       </div>
 
       {/* Section 1 — General */}
-      <Section title="General" isEditing={editingSection === 'general'} onEdit={() => startEdit('general')} canEdit={canEdit}>
+      <Section
+        title="General"
+        isEditing={editingSection === 'general'}
+        onEdit={() => startEdit('general')}
+        canEdit={canEdit}
+        isDirty={isDirty}
+      >
         {editingSection === 'general' ? (
           <>
             <EditTextArea
@@ -410,13 +434,11 @@ export default function InjuryStatusTab({ caseId }: Props) {
               placeholder="Describe the injuries sustained..."
               rows={3}
             />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-3">
-                <Toggle id="er_visit" checked={form.er_visit} onChange={set('er_visit')} label="ER Visit" />
-                {form.er_visit && (
-                  <EditTextField label="ER Visit Date" type="date" value={form.er_visit_date} onChange={setText('er_visit_date')} />
-                )}
-              </div>
+            <div className="space-y-4">
+              <Toggle id="er_visit" checked={form.er_visit} onChange={set('er_visit')} label="ER Visit" />
+              {form.er_visit && (
+                <EditTextField label="ER Visit Date" type="date" value={form.er_visit_date} onChange={setText('er_visit_date')} />
+              )}
               <EditTextField
                 label="Treating Physicians"
                 value={form.treating_physicians}
@@ -424,11 +446,11 @@ export default function InjuryStatusTab({ caseId }: Props) {
                 placeholder="e.g. Dr. Smith, Dr. Reyes"
               />
             </div>
-            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} />
+            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} lastSavedAt={lastSavedAt} />
           </>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
+          <div className="space-y-4">
+            <div>
               <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">Injury Description</p>
               {form.injury_description
                 ? <p className="text-sm text-[#2b2b2b] whitespace-pre-wrap">{form.injury_description}</p>
@@ -445,119 +467,119 @@ export default function InjuryStatusTab({ caseId }: Props) {
       </Section>
 
       {/* Section 2 — Diagnostic */}
-      <Section title="Diagnostic" isEditing={editingSection === 'diagnostic'} onEdit={() => startEdit('diagnostic')} canEdit={canEdit}>
+      <Section
+        title="Diagnostic"
+        isEditing={editingSection === 'diagnostic'}
+        onEdit={() => startEdit('diagnostic')}
+        canEdit={canEdit}
+        isDirty={isDirty}
+      >
         {editingSection === 'diagnostic' ? (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-3">
-                <StatusSelect label="MRI Status" value={form.mri_status} options={MRI_OPTIONS} onChange={set('mri_status')} />
-                {form.mri_status !== 'none' && (
-                  <EditTextArea label="MRI Notes" value={form.mri_notes} onChange={setText('mri_notes')} rows={2} />
-                )}
-              </div>
-              <div className="space-y-3">
-                <Toggle id="tbi_diagnosed" checked={form.tbi_diagnosed} onChange={set('tbi_diagnosed')} label="TBI Diagnosed" />
-                {form.tbi_diagnosed && (
-                  <EditTextArea label="TBI Notes" value={form.tbi_notes} onChange={setText('tbi_notes')} rows={2} />
-                )}
-              </div>
+            <div className="space-y-4">
+              <StatusSelect label="MRI Status" value={form.mri_status} options={MRI_OPTIONS} onChange={set('mri_status')} />
+              {form.mri_status !== 'none' && (
+                <EditTextArea label="MRI Notes" value={form.mri_notes} onChange={setText('mri_notes')} rows={2} />
+              )}
+              <Toggle id="tbi_diagnosed" checked={form.tbi_diagnosed} onChange={set('tbi_diagnosed')} label="TBI Diagnosed" />
+              {form.tbi_diagnosed && (
+                <EditTextArea label="TBI Notes" value={form.tbi_notes} onChange={setText('tbi_notes')} rows={2} />
+              )}
             </div>
-            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} />
+            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} lastSavedAt={lastSavedAt} />
           </>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-3">
-              <ReadStatusBadge
-                label="MRI Status"
-                value={form.mri_status}
-                displayLabel={getLabel(MRI_OPTIONS, form.mri_status)}
-              />
-              {form.mri_status !== 'none' && (
-                <div>
-                  <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">MRI Notes</p>
-                  <ReadNotes value={form.mri_notes} />
-                </div>
-              )}
-            </div>
-            <div className="space-y-3">
-              <BoolBadge label="TBI Diagnosed" value={form.tbi_diagnosed} />
-              {form.tbi_diagnosed && (
-                <div>
-                  <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">TBI Notes</p>
-                  <ReadNotes value={form.tbi_notes} />
-                </div>
-              )}
-            </div>
+          <div className="space-y-4">
+            <ReadStatusBadge
+              label="MRI Status"
+              value={form.mri_status}
+              displayLabel={getLabel(MRI_OPTIONS, form.mri_status)}
+            />
+            {form.mri_status !== 'none' && (
+              <div>
+                <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">MRI Notes</p>
+                <ReadNotes value={form.mri_notes} />
+              </div>
+            )}
+            <BoolBadge label="TBI Diagnosed" value={form.tbi_diagnosed} />
+            {form.tbi_diagnosed && (
+              <div>
+                <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">TBI Notes</p>
+                <ReadNotes value={form.tbi_notes} />
+              </div>
+            )}
           </div>
         )}
       </Section>
 
       {/* Section 3 — Treatment */}
-      <Section title="Treatment" isEditing={editingSection === 'treatment'} onEdit={() => startEdit('treatment')} canEdit={canEdit}>
+      <Section
+        title="Treatment"
+        isEditing={editingSection === 'treatment'}
+        onEdit={() => startEdit('treatment')}
+        canEdit={canEdit}
+        isDirty={isDirty}
+      >
         {editingSection === 'treatment' ? (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-3">
-                <StatusSelect label="Injections Status" value={form.injections_status} options={INJECTION_OPTIONS} onChange={set('injections_status')} />
-                {form.injections_status !== 'none' && (
-                  <EditTextArea label="Injections Notes" value={form.injections_notes} onChange={setText('injections_notes')} rows={2} />
-                )}
-              </div>
-              <div className="space-y-3">
-                <StatusSelect label="Surgery Status" value={form.surgery_status} options={SURGERY_OPTIONS} onChange={set('surgery_status')} />
-                {form.surgery_status !== 'none' && (
-                  <EditTextArea label="Surgery Notes" value={form.surgery_notes} onChange={setText('surgery_notes')} rows={2} />
-                )}
-              </div>
+            <div className="space-y-4">
+              <StatusSelect label="Injections Status" value={form.injections_status} options={INJECTION_OPTIONS} onChange={set('injections_status')} />
+              {form.injections_status !== 'none' && (
+                <EditTextArea label="Injections Notes" value={form.injections_notes} onChange={setText('injections_notes')} rows={2} />
+              )}
+              <StatusSelect label="Surgery Status" value={form.surgery_status} options={SURGERY_OPTIONS} onChange={set('surgery_status')} />
+              {form.surgery_status !== 'none' && (
+                <EditTextArea label="Surgery Notes" value={form.surgery_notes} onChange={setText('surgery_notes')} rows={2} />
+              )}
+              <EditTextField
+                label="Current Treatment Status"
+                value={form.current_treatment_status}
+                onChange={setText('current_treatment_status')}
+                placeholder="e.g. Active chiropractic care, 2x per week"
+              />
             </div>
-            <EditTextField
-              label="Current Treatment Status"
-              value={form.current_treatment_status}
-              onChange={setText('current_treatment_status')}
-              placeholder="e.g. Active chiropractic care, 2x per week"
-            />
-            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} />
+            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} lastSavedAt={lastSavedAt} />
           </>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-3">
-              <ReadStatusBadge
-                label="Injections Status"
-                value={form.injections_status}
-                displayLabel={getLabel(INJECTION_OPTIONS, form.injections_status)}
-              />
-              {form.injections_status !== 'none' && (
-                <div>
-                  <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">Injections Notes</p>
-                  <ReadNotes value={form.injections_notes} />
-                </div>
-              )}
-            </div>
-            <div className="space-y-3">
-              <ReadStatusBadge
-                label="Surgery Status"
-                value={form.surgery_status}
-                displayLabel={getLabel(SURGERY_OPTIONS, form.surgery_status)}
-              />
-              {form.surgery_status !== 'none' && (
-                <div>
-                  <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">Surgery Notes</p>
-                  <ReadNotes value={form.surgery_notes} />
-                </div>
-              )}
-            </div>
-            <div className="sm:col-span-2">
-              <ReadField label="Current Treatment Status" value={form.current_treatment_status} />
-            </div>
+          <div className="space-y-4">
+            <ReadStatusBadge
+              label="Injections Status"
+              value={form.injections_status}
+              displayLabel={getLabel(INJECTION_OPTIONS, form.injections_status)}
+            />
+            {form.injections_status !== 'none' && (
+              <div>
+                <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">Injections Notes</p>
+                <ReadNotes value={form.injections_notes} />
+              </div>
+            )}
+            <ReadStatusBadge
+              label="Surgery Status"
+              value={form.surgery_status}
+              displayLabel={getLabel(SURGERY_OPTIONS, form.surgery_status)}
+            />
+            {form.surgery_status !== 'none' && (
+              <div>
+                <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">Surgery Notes</p>
+                <ReadNotes value={form.surgery_notes} />
+              </div>
+            )}
+            <ReadField label="Current Treatment Status" value={form.current_treatment_status} />
           </div>
         )}
       </Section>
 
       {/* Section 4 — MMI */}
-      <Section title="Maximum Medical Improvement" isEditing={editingSection === 'mmi'} onEdit={() => startEdit('mmi')} canEdit={canEdit}>
+      <Section
+        title="Maximum Medical Improvement"
+        isEditing={editingSection === 'mmi'}
+        onEdit={() => startEdit('mmi')}
+        canEdit={canEdit}
+        isDirty={isDirty}
+      >
         {editingSection === 'mmi' ? (
           <>
-            <div className="flex flex-wrap items-start gap-6">
+            <div className="space-y-4">
               <Toggle id="mmi_reached" checked={form.mmi_reached} onChange={set('mmi_reached')} label="MMI Reached" />
               {form.mmi_reached && (
                 <div className="w-48">
@@ -565,10 +587,10 @@ export default function InjuryStatusTab({ caseId }: Props) {
                 </div>
               )}
             </div>
-            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} />
+            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} lastSavedAt={lastSavedAt} />
           </>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-4">
             <BoolBadge label="MMI Reached" value={form.mmi_reached} />
             <ReadField
               label="MMI Date"
@@ -579,17 +601,23 @@ export default function InjuryStatusTab({ caseId }: Props) {
       </Section>
 
       {/* Section 5 — Additional Notes */}
-      <Section title="Additional Notes" isEditing={editingSection === 'notes'} onEdit={() => startEdit('notes')} canEdit={canEdit}>
+      <Section
+        title="Additional Notes"
+        isEditing={editingSection === 'notes'}
+        onEdit={() => startEdit('notes')}
+        canEdit={canEdit}
+        isDirty={isDirty}
+      >
         {editingSection === 'notes' ? (
           <>
             <EditTextArea
-              label=""
+              label="Additional Notes"
               value={form.additional_notes}
               onChange={setText('additional_notes')}
               placeholder="Any additional notes about the client's injury or treatment..."
               rows={4}
             />
-            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} />
+            <EditActions onSave={saveSection} onCancel={cancelEdit} saving={saving} error={saveError} lastSavedAt={lastSavedAt} />
           </>
         ) : (
           <ReadNotes value={form.additional_notes} />

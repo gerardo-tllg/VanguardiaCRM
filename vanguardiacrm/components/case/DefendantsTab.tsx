@@ -38,6 +38,10 @@ function parseCurrency(value: string): number | null {
   return isNaN(parsed) ? null : parsed
 }
 
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 type FieldConfig = {
   key: keyof DefendantForm
   label: string
@@ -53,8 +57,8 @@ const FIELDS: FieldConfig[] = [
   { key: 'adjuster_phone', label: 'Adjuster Phone', type: 'tel' },
   { key: 'adjuster_email', label: 'Adjuster Email', type: 'email' },
   { key: 'policy_limits', label: 'Policy Limits', type: 'currency' },
-  { key: 'bi_limits', label: 'BI Limits', type: 'currency' },
-  { key: 'um_uim_limits', label: 'UM/UIM Limits', type: 'currency' },
+  { key: 'bi_limits', label: 'Bodily Injury (BI) Limits', type: 'currency' },
+  { key: 'um_uim_limits', label: 'Uninsured/Underinsured (UM/UIM) Limits', type: 'currency' },
   { key: 'med_pay_limits', label: 'Med Pay Limits', type: 'currency' },
   { key: 'property_damage_limits', label: 'Property Damage Limits', type: 'currency' },
   { key: 'notes', label: 'Notes', type: 'textarea' },
@@ -76,9 +80,11 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
 function DefendantFormFields({
   form,
   onChange,
+  validationError,
 }: {
   form: DefendantForm
   onChange: (key: keyof DefendantForm, value: string) => void
+  validationError?: string | null
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -94,22 +100,29 @@ function DefendantFormFields({
                 rows={3}
                 value={value}
                 onChange={(e) => onChange(key, e.target.value)}
-                className="w-full rounded-md border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91] resize-none"
+                className="w-full resize-none rounded-md border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
               />
             </div>
           )
         }
 
         return (
-          <div key={key}>
+          <div key={key} className={key === 'um_uim_limits' ? 'sm:col-span-2' : ''}>
             <label className="mb-1 block text-xs font-medium text-[#6b6b6b]">{label}</label>
             <input
               type={type === 'currency' ? 'text' : type}
               value={value}
               placeholder={type === 'currency' ? '$0' : ''}
               onChange={(e) => onChange(key, e.target.value)}
-              className="w-full rounded-md border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
+              className={`w-full rounded-md border px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91] ${
+                key === 'defendant_name' && validationError
+                  ? 'border-red-400 bg-[#fff5f5]'
+                  : 'border-[#e5e5e5]'
+              }`}
             />
+            {key === 'defendant_name' && validationError && (
+              <p className="mt-1 text-xs text-red-600">{validationError}</p>
+            )}
           </div>
         )
       })}
@@ -136,8 +149,13 @@ function DefendantCard({
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+
+  const isDirty = JSON.stringify(form) !== JSON.stringify(savedForm)
 
   function handleChange(key: keyof DefendantForm, value: string) {
+    if (key === 'defendant_name') setValidationError(null)
     setForm((prev) => ({
       ...prev,
       [key]: CURRENCY_KEYS.has(key) ? parseCurrency(value) : (value === '' ? null : value),
@@ -145,6 +163,10 @@ function DefendantCard({
   }
 
   async function handleSave() {
+    if (!form.defendant_name?.trim()) {
+      setValidationError('Defendant name is required.')
+      return
+    }
     setSaving(true)
     setError(null)
     const err = await onSave(defendant.id, form)
@@ -153,6 +175,7 @@ function DefendantCard({
       setError(err)
     } else {
       setSavedForm(form)
+      setLastSavedAt(new Date())
       setEditing(false)
     }
   }
@@ -161,6 +184,7 @@ function DefendantCard({
     setForm(savedForm)
     setEditing(false)
     setError(null)
+    setValidationError(null)
   }
 
   async function handleDelete() {
@@ -185,7 +209,7 @@ function DefendantCard({
             <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
-                onClick={() => setEditing(true)}
+                onClick={() => { setEditing(true); setError(null); setValidationError(null) }}
                 className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-xs font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
               >
                 Edit
@@ -228,10 +252,10 @@ function DefendantCard({
             <InfoRow label="Adjuster Email" value={defendant.adjuster_email} />
             <InfoRow label="Claim #" value={defendant.claim_number} />
             <InfoRow label="Policy Limits" value={formatUSD(defendant.policy_limits)} />
-            <InfoRow label="BI Limits" value={formatUSD(defendant.bi_limits)} />
-            <InfoRow label="UM/UIM" value={formatUSD(defendant.um_uim_limits)} />
-            <InfoRow label="Med Pay" value={formatUSD(defendant.med_pay_limits)} />
-            <InfoRow label="Prop. Damage" value={formatUSD(defendant.property_damage_limits)} />
+            <InfoRow label="Bodily Injury (BI) Limits" value={formatUSD(defendant.bi_limits)} />
+            <InfoRow label="Uninsured/Underinsured (UM/UIM) Limits" value={formatUSD(defendant.um_uim_limits)} />
+            <InfoRow label="Med Pay Limits" value={formatUSD(defendant.med_pay_limits)} />
+            <InfoRow label="Property Damage Limits" value={formatUSD(defendant.property_damage_limits)} />
           </div>
 
           <div className="mt-4">
@@ -242,17 +266,30 @@ function DefendantCard({
               </p>
             ) : (
               <p className="mt-1 rounded-md bg-[#f9f9f9] px-3 py-2 text-sm italic text-[#9b9b9b]">
-                No notes added
+                No notes added.
               </p>
             )}
           </div>
         </>
       ) : (
         <>
-          <h3 className="mb-4 text-sm font-semibold text-[#2b2b2b]">Edit Defendant</h3>
-          <DefendantFormFields form={form} onChange={handleChange} />
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-[#2b2b2b]">
+              Edit: {form.defendant_name?.trim() || 'Unnamed Defendant'}
+            </h3>
+            {isDirty && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                Unsaved changes
+              </span>
+            )}
+          </div>
+
+          <DefendantFormFields form={form} onChange={handleChange} validationError={validationError} />
+
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-          <div className="mt-4 flex items-center gap-2">
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={handleSave}
@@ -268,6 +305,9 @@ function DefendantCard({
             >
               Cancel
             </button>
+            {lastSavedAt && !isDirty && (
+              <span className="text-xs text-[#9b9b9b]">Last saved: {formatTime(lastSavedAt)}</span>
+            )}
           </div>
         </>
       )}
@@ -285,6 +325,7 @@ export default function DefendantsTab({ caseId }: Props) {
   const [addForm, setAddForm] = useState<DefendantForm>(EMPTY_FORM)
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+  const [addValidationError, setAddValidationError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchDefendants() {
@@ -307,6 +348,7 @@ export default function DefendantsTab({ caseId }: Props) {
   }, [caseId, supabase])
 
   function handleAddChange(key: keyof DefendantForm, value: string) {
+    if (key === 'defendant_name') setAddValidationError(null)
     setAddForm((prev) => ({
       ...prev,
       [key]: CURRENCY_KEYS.has(key) ? parseCurrency(value) : (value === '' ? null : value),
@@ -314,6 +356,10 @@ export default function DefendantsTab({ caseId }: Props) {
   }
 
   async function handleAdd() {
+    if (!addForm.defendant_name?.trim()) {
+      setAddValidationError('Defendant name is required.')
+      return
+    }
     setAdding(true)
     setAddError(null)
 
@@ -364,7 +410,9 @@ export default function DefendantsTab({ caseId }: Props) {
         <div>
           <h2 className="text-lg font-semibold text-[#2b2b2b]">Defendants</h2>
           <p className="text-sm text-[#6b6b6b]">
-            {defendants.length === 0 ? 'No defendants on record' : `${defendants.length} defendant${defendants.length !== 1 ? 's' : ''}`}
+            {defendants.length === 0
+              ? 'No defendants on record'
+              : `${defendants.length} defendant${defendants.length !== 1 ? 's' : ''}`}
           </p>
         </div>
         <button
@@ -372,6 +420,7 @@ export default function DefendantsTab({ caseId }: Props) {
           onClick={() => {
             setShowAddForm((prev) => !prev)
             setAddError(null)
+            setAddValidationError(null)
           }}
           className="rounded-md bg-[#1d4f91] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a4580]"
         >
@@ -382,7 +431,7 @@ export default function DefendantsTab({ caseId }: Props) {
       {showAddForm && (
         <div className="rounded-xl border border-[#c9daf7] bg-[#f5f8ff] p-5">
           <h3 className="mb-4 text-sm font-semibold text-[#1d4f91]">New Defendant</h3>
-          <DefendantFormFields form={addForm} onChange={handleAddChange} />
+          <DefendantFormFields form={addForm} onChange={handleAddChange} validationError={addValidationError} />
           {addError && <p className="mt-3 text-sm text-red-600">{addError}</p>}
           <div className="mt-4 flex items-center gap-2">
             <button
@@ -399,6 +448,7 @@ export default function DefendantsTab({ caseId }: Props) {
                 setShowAddForm(false)
                 setAddForm(EMPTY_FORM)
                 setAddError(null)
+                setAddValidationError(null)
               }}
               className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
             >

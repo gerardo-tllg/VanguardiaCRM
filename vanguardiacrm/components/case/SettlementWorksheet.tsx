@@ -41,25 +41,29 @@ function usd(val: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(val)
 }
 
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 function dbToForm(ws: SettlementWorksheet): WorksheetForm {
   return {
-    gross_settlement:           ws.gross_settlement === 0           ? '' : String(ws.gross_settlement),
-    attorney_fee_percentage:    String(ws.attorney_fee_percentage),
-    litigation_costs:           ws.litigation_costs === 0           ? '' : String(ws.litigation_costs),
-    case_costs:                 ws.case_costs === 0                 ? '' : String(ws.case_costs),
-    advances_issued:            ws.advances_issued === 0            ? '' : String(ws.advances_issued),
-    medical_bills_total:        ws.medical_bills_total === 0        ? '' : String(ws.medical_bills_total),
-    attorney_liens:             ws.attorney_liens === 0             ? '' : String(ws.attorney_liens),
+    gross_settlement:             ws.gross_settlement === 0             ? '' : String(ws.gross_settlement),
+    attorney_fee_percentage:      String(ws.attorney_fee_percentage),
+    litigation_costs:             ws.litigation_costs === 0             ? '' : String(ws.litigation_costs),
+    case_costs:                   ws.case_costs === 0                   ? '' : String(ws.case_costs),
+    advances_issued:              ws.advances_issued === 0              ? '' : String(ws.advances_issued),
+    medical_bills_total:          ws.medical_bills_total === 0          ? '' : String(ws.medical_bills_total),
+    attorney_liens:               ws.attorney_liens === 0               ? '' : String(ws.attorney_liens),
     health_insurance_subrogation: ws.health_insurance_subrogation === 0 ? '' : String(ws.health_insurance_subrogation),
-    med_pay_recovery:           ws.med_pay_recovery === 0           ? '' : String(ws.med_pay_recovery),
-    notes:                      ws.notes ?? '',
+    med_pay_recovery:             ws.med_pay_recovery === 0             ? '' : String(ws.med_pay_recovery),
+    notes:                        ws.notes ?? '',
   }
 }
 
-// ── Shared read/edit row primitives ──────────────────────────────────────────
+// ── Primitives ───────────────────────────────────────────────────────────────
 
 function ReadNotes({ value }: { value: string }) {
-  if (!value) return <p className="text-sm italic text-[#b9b9b9]">No notes added</p>
+  if (!value) return <p className="text-sm italic text-[#b9b9b9]">No notes added.</p>
   return (
     <p className="rounded-md bg-[#f9f9f9] px-3 py-2 text-sm leading-relaxed text-[#2b2b2b] whitespace-pre-wrap">
       {value}
@@ -67,8 +71,20 @@ function ReadNotes({ value }: { value: string }) {
   )
 }
 
-function ReadRow({ num, label, sublabel, amount, isDeduction = true }: {
-  num?: number; label: string; sublabel?: string; amount: number; isDeduction?: boolean
+function SignBadge({ sign }: { sign: '+' | '-' }) {
+  return (
+    <span className={`inline-flex h-5 w-5 items-center justify-center rounded text-xs font-bold ${
+      sign === '+'
+        ? 'bg-[#ecf8f1] text-[#1f7a4d]'
+        : 'bg-[#f5f5f5] text-[#9b9b9b]'
+    }`}>
+      {sign === '+' ? '+' : '−'}
+    </span>
+  )
+}
+
+function ReadRow({ num, label, sublabel, amount, sign = '-' }: {
+  num?: number; label: string; sublabel?: string; amount: number; sign?: '+' | '-'
 }) {
   return (
     <div className="flex items-center gap-4 py-3">
@@ -86,8 +102,8 @@ function ReadRow({ num, label, sublabel, amount, isDeduction = true }: {
       <p className="w-40 text-right text-sm text-[#2b2b2b]">
         {amount === 0 ? <span className="text-[#b9b9b9]">—</span> : usd(amount)}
       </p>
-      <div className="w-4 shrink-0 text-center text-[#9b9b9b]">
-        {isDeduction ? '−' : ''}
+      <div className="w-6 shrink-0 text-center">
+        <SignBadge sign={sign} />
       </div>
     </div>
   )
@@ -119,7 +135,9 @@ function EditRow({ num, label, sublabel, value, onChange }: {
           className="w-40 rounded-md border border-[#e5e5e5] py-2 pl-7 pr-3 text-right text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
         />
       </div>
-      <div className="w-4 shrink-0 text-center text-[#9b9b9b]">−</div>
+      <div className="w-6 shrink-0 text-center">
+        <SignBadge sign="-" />
+      </div>
     </div>
   )
 }
@@ -136,7 +154,7 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
 
   useEffect(() => {
     async function fetchWorksheet() {
@@ -184,10 +202,11 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
   const netToClient = gross - totalDeductions
   const isNegative  = netToClient < 0
 
+  const isDirty = JSON.stringify(form) !== JSON.stringify(savedForm)
+
   async function handleSave() {
     setSaving(true)
     setSaveError(null)
-    setSaved(false)
 
     const payload = {
       case_id: caseId,
@@ -219,8 +238,7 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
     setExistingId(data.id)
     setSavedForm(form)
     setEditing(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    setLastSavedAt(new Date())
     setSaving(false)
   }
 
@@ -236,7 +254,17 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
             {editing ? 'Live calculation — save when ready' : 'Last saved figures'}
           </p>
         </div>
-        {saved && <span className="text-sm font-medium text-[#1f7a4d]">Saved</span>}
+        <div className="flex items-center gap-3">
+          {editing && isDirty && (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              Unsaved changes
+            </span>
+          )}
+          {lastSavedAt && !isDirty && (
+            <span className="text-xs text-[#9b9b9b]">Last saved: {formatTime(lastSavedAt)}</span>
+          )}
+        </div>
       </div>
 
       {/* Worksheet card */}
@@ -246,7 +274,7 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
           <div className="w-16 shrink-0" />
           <p className="flex-1 text-xs font-semibold uppercase tracking-wide text-[#9b9b9b]">Line Item</p>
           <p className="w-40 text-right text-xs font-semibold uppercase tracking-wide text-[#9b9b9b]">Amount</p>
-          <div className="flex w-4 shrink-0 justify-end">
+          <div className="flex w-6 shrink-0 justify-end">
             {!editing && (
               <button
                 type="button"
@@ -282,7 +310,9 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
                 {gross === 0 ? <span className="text-[#b9b9b9]">—</span> : usd(gross)}
               </p>
             )}
-            <div className="w-4 shrink-0" />
+            <div className="w-6 shrink-0 text-center">
+              <SignBadge sign="+" />
+            </div>
           </div>
 
           {/* Tier 2 — Attorney Fee */}
@@ -293,46 +323,53 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
             <div className="flex-1">
               <p className="text-sm font-medium text-[#2b2b2b]">Attorney Fee</p>
               {editing ? (
-                <div className="mt-1 flex items-center gap-1.5">
+                <div className="mt-1 flex items-center gap-2">
                   <input
                     type="text"
                     value={form.attorney_fee_percentage}
                     onChange={(e) => set('attorney_fee_percentage')(e.target.value)}
                     className="w-16 rounded-md border border-[#e5e5e5] px-2 py-1 text-right text-xs text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
                   />
-                  <span className="text-xs text-[#9b9b9b]">% = {usd(feeAmount)}</span>
+                  <span className="text-xs font-medium text-[#6b6b6b]">%</span>
                 </div>
               ) : (
                 <p className="text-xs text-[#9b9b9b]">{feePercent}% of gross</p>
               )}
             </div>
-            {editing ? (
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#9b9b9b]">$</span>
-                <input
-                  type="text"
-                  value={feeAmount === 0 ? '' : feeAmount.toFixed(2)}
-                  readOnly
-                  tabIndex={-1}
-                  className="w-40 cursor-default rounded-md border border-[#e5e5e5] bg-[#f9f9f9] py-2 pl-7 pr-3 text-right text-sm text-[#6b6b6b] outline-none"
-                />
-              </div>
-            ) : (
-              <p className="w-40 text-right text-sm text-[#2b2b2b]">
-                {feeAmount === 0 ? <span className="text-[#b9b9b9]">—</span> : usd(feeAmount)}
-              </p>
-            )}
-            <div className="w-4 shrink-0 text-center text-[#9b9b9b]">−</div>
+            <div className="w-40">
+              {editing ? (
+                <div>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#9b9b9b]">$</span>
+                    <input
+                      type="text"
+                      value={feeAmount === 0 ? '' : feeAmount.toFixed(2)}
+                      readOnly
+                      tabIndex={-1}
+                      className="w-40 cursor-default rounded-md border border-[#e5e5e5] bg-[#f9f9f9] py-2 pl-7 pr-3 text-right text-sm text-[#6b6b6b] outline-none"
+                    />
+                  </div>
+                  <p className="mt-0.5 text-right text-[10px] text-[#9b9b9b]">auto-calculated</p>
+                </div>
+              ) : (
+                <p className="text-right text-sm text-[#2b2b2b]">
+                  {feeAmount === 0 ? <span className="text-[#b9b9b9]">—</span> : usd(feeAmount)}
+                </p>
+              )}
+            </div>
+            <div className="w-6 shrink-0 text-center">
+              <SignBadge sign="-" />
+            </div>
           </div>
 
           {/* Tiers 3–7 */}
           {editing ? (
             <>
-              <EditRow num={3} label="Litigation Costs"    value={form.litigation_costs}  onChange={set('litigation_costs')} />
-              <EditRow num={4} label="Case Costs"          value={form.case_costs}         onChange={set('case_costs')} />
-              <EditRow num={5} label="Advances Issued"     value={form.advances_issued}    onChange={set('advances_issued')} />
+              <EditRow num={3} label="Litigation Costs"    value={form.litigation_costs}   onChange={set('litigation_costs')} />
+              <EditRow num={4} label="Case Costs"          value={form.case_costs}          onChange={set('case_costs')} />
+              <EditRow num={5} label="Advances Issued"     value={form.advances_issued}     onChange={set('advances_issued')} />
               <EditRow num={6} label="Medical Bills Total" value={form.medical_bills_total} onChange={set('medical_bills_total')} />
-              <EditRow num={7} label="Attorney Liens"      value={form.attorney_liens}     onChange={set('attorney_liens')} />
+              <EditRow num={7} label="Attorney Liens"      value={form.attorney_liens}      onChange={set('attorney_liens')} />
             </>
           ) : (
             <>
@@ -350,7 +387,6 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#eef4ff] text-xs font-semibold text-[#1d4f91]">8</span>
             </div>
             <div className="flex-1 space-y-2">
-              {/* Health Insurance Subrogation */}
               <div className="flex items-center justify-between gap-4">
                 <p className="text-sm font-medium text-[#2b2b2b]">Health Insurance Subrogation</p>
                 {editing ? (
@@ -364,7 +400,6 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
                   </p>
                 )}
               </div>
-              {/* Med Pay Recovery */}
               <div className="flex items-center justify-between gap-4">
                 <p className="text-sm font-medium text-[#2b2b2b]">Med Pay Recovery</p>
                 {editing ? (
@@ -379,7 +414,9 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
                 )}
               </div>
             </div>
-            <div className="w-4 shrink-0 text-center text-[#9b9b9b]">−</div>
+            <div className="w-6 shrink-0 text-center">
+              <SignBadge sign="-" />
+            </div>
           </div>
         </div>
 
@@ -389,7 +426,7 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
             <div className="w-16 shrink-0" />
             <p className="flex-1 text-sm font-medium text-[#6b6b6b]">Total Deductions</p>
             <p className="w-40 text-right text-sm font-medium text-[#6b6b6b]">{usd(totalDeductions)}</p>
-            <div className="w-4 shrink-0" />
+            <div className="w-6 shrink-0" />
           </div>
 
           <div className={`mb-4 flex items-center gap-4 rounded-lg px-4 py-4 ${isNegative ? 'bg-[#fff5f5]' : 'bg-[#ecf8f1]'}`}>
@@ -403,15 +440,15 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
             <p className={`w-40 text-right text-xl font-bold ${isNegative ? 'text-red-700' : 'text-[#1f7a4d]'}`}>
               {usd(netToClient)}
             </p>
-            <div className="w-4 shrink-0" />
+            <div className="w-6 shrink-0" />
           </div>
         </div>
 
-        {/* Edit mode save/cancel */}
+        {/* Save/Cancel — top of form (inside card, at bottom of rows) */}
         {editing && (
           <div className="border-t border-[#e5e5e5] px-6 py-4">
             {saveError && <p className="mb-3 text-sm text-red-600">{saveError}</p>}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={handleSave}
@@ -460,6 +497,32 @@ export default function SettlementWorksheetTab({ caseId }: Props) {
           <ReadNotes value={form.notes} />
         )}
       </div>
+
+      {/* Second Save button at bottom of page */}
+      {editing && (
+        <div className="rounded-xl border border-[#e5e5e5] bg-white px-6 py-4">
+          {saveError && <p className="mb-3 text-sm text-red-600">{saveError}</p>}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-md bg-[#1d4f91] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a4580] disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Worksheet'}
+            </button>
+            {existingId && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

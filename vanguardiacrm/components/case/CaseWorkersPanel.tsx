@@ -49,14 +49,19 @@ function formatDate(iso: string): string {
   })
 }
 
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 type WorkerCardProps = {
   role: RoleConfig
   worker: CaseWorker | null
+  isPrimary: boolean
   onSave: (role: CaseWorkerRole, form: WorkerForm) => Promise<string | null>
   onRemove: (id: string, role: CaseWorkerRole) => Promise<void>
 }
 
-function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
+function WorkerCard({ role, worker, isPrimary, onSave, onRemove }: WorkerCardProps) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<WorkerForm>(
     worker
@@ -73,6 +78,9 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
   const [removing, setRemoving] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+
+  const isDirty = JSON.stringify(form) !== JSON.stringify(savedForm)
 
   function set(key: keyof WorkerForm) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -88,6 +96,7 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
       setError(err)
     } else {
       setSavedForm(form)
+      setLastSavedAt(new Date())
       setEditing(false)
     }
   }
@@ -113,15 +122,19 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
   return (
     <div
       className={`rounded-xl border p-4 ${
-        isAssigned
-          ? 'border-[#e5e5e5] bg-white'
-          : 'border-dashed border-[#d9d9d9] bg-[#fafafa]'
+        isPrimary ? 'border-amber-200 border-l-4 border-l-amber-400 bg-white' : ''
+      } ${
+        !isPrimary && isAssigned ? 'border-[#e5e5e5] bg-white' : ''
+      } ${
+        !isPrimary && !isAssigned ? 'border-dashed border-[#d9d9d9] bg-[#fafafa]' : ''
       }`}
     >
       {/* Role label + action buttons */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#9b9b9b]">
+          <p className={`text-xs font-semibold uppercase tracking-wide ${
+            isPrimary ? 'text-amber-600' : 'text-[#9b9b9b]'
+          }`}>
             {role.label}
           </p>
           {isAssigned && !editing && (
@@ -201,7 +214,7 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
               </p>
             ) : (
               <p className="mt-0.5 rounded-md bg-[#f9f9f9] px-2.5 py-1.5 text-xs italic text-[#9b9b9b]">
-                No notes added
+                No notes added.
               </p>
             )}
           </div>
@@ -210,12 +223,21 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
 
       {/* Empty unassigned state */}
       {!isAssigned && !editing && (
-        <p className="text-xs text-[#b9b9b9]">Not assigned</p>
+        <p className="text-xs text-[#b9b9b9]">
+          {isPrimary ? 'Start by assigning an Attorney of Record' : 'Not assigned'}
+        </p>
       )}
 
       {/* Edit / Assign form */}
       {editing && (
         <div className="space-y-3">
+          {isDirty && (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              Unsaved changes
+            </span>
+          )}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-[#6b6b6b]">Name</label>
@@ -257,7 +279,7 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
 
           {error && <p className="text-xs text-red-600">{error}</p>}
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleSave}
@@ -273,6 +295,9 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
             >
               Cancel
             </button>
+            {lastSavedAt && !isDirty && (
+              <span className="text-[10px] text-[#9b9b9b]">Last saved: {formatTime(lastSavedAt)}</span>
+            )}
           </div>
         </div>
       )}
@@ -371,6 +396,7 @@ export default function CaseWorkersPanel({ caseId }: Props) {
             key={role.key}
             role={role}
             worker={workerMap[role.key] ?? null}
+            isPrimary={role.key === 'attorney_of_record'}
             onSave={handleSave}
             onRemove={handleRemove}
           />
