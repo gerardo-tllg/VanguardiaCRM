@@ -186,7 +186,7 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
             </div>
           ) : (
             <div className="rounded-md border border-[#e5e5e5] bg-white px-3 py-2">
-              <p className="text-sm text-[#9b9b9b]">No Hona action for this phase.</p>
+              <p className="text-sm text-[#9b9b9b]">No automation action configured for this phase.</p>
             </div>
           )}
         </div>

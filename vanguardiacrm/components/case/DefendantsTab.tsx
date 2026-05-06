@@ -64,6 +64,15 @@ const CURRENCY_KEYS = new Set<keyof DefendantForm>([
   'policy_limits', 'bi_limits', 'um_uim_limits', 'med_pay_limits', 'property_damage_limits',
 ])
 
+function InfoRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <p className="text-xs text-[#9b9b9b]">{label}</p>
+      <p className="text-sm font-medium text-[#2b2b2b]">{value ?? '—'}</p>
+    </div>
+  )
+}
+
 function DefendantFormFields({
   form,
   onChange,
@@ -114,7 +123,7 @@ function DefendantCard({
   onDelete,
 }: {
   defendant: Defendant
-  onSave: (id: string, form: DefendantForm) => Promise<void>
+  onSave: (id: string, form: DefendantForm) => Promise<string | null>
   onDelete: (id: string) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
@@ -122,6 +131,7 @@ function DefendantCard({
     const { id, case_id, created_at, updated_at, ...rest } = defendant
     return rest
   })
+  const [savedForm, setSavedForm] = useState<DefendantForm>(form)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -137,9 +147,20 @@ function DefendantCard({
   async function handleSave() {
     setSaving(true)
     setError(null)
-    await onSave(defendant.id, form)
+    const err = await onSave(defendant.id, form)
     setSaving(false)
+    if (err) {
+      setError(err)
+    } else {
+      setSavedForm(form)
+      setEditing(false)
+    }
+  }
+
+  function handleCancel() {
+    setForm(savedForm)
     setEditing(false)
+    setError(null)
   }
 
   async function handleDelete() {
@@ -200,42 +221,31 @@ function DefendantCard({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-8 gap-y-2 sm:grid-cols-3">
-            {defendant.adjuster_name && (
-              <InfoRow label="Adjuster" value={defendant.adjuster_name} />
-            )}
-            {defendant.adjuster_phone && (
-              <InfoRow label="Phone" value={defendant.adjuster_phone} />
-            )}
-            {defendant.adjuster_email && (
-              <InfoRow label="Email" value={defendant.adjuster_email} />
-            )}
-            {defendant.claim_number && (
-              <InfoRow label="Claim #" value={defendant.claim_number} />
-            )}
-            {defendant.policy_limits !== null && (
-              <InfoRow label="Policy Limits" value={formatUSD(defendant.policy_limits)} />
-            )}
-            {defendant.bi_limits !== null && (
-              <InfoRow label="BI Limits" value={formatUSD(defendant.bi_limits)} />
-            )}
-            {defendant.um_uim_limits !== null && (
-              <InfoRow label="UM/UIM" value={formatUSD(defendant.um_uim_limits)} />
-            )}
-            {defendant.med_pay_limits !== null && (
-              <InfoRow label="Med Pay" value={formatUSD(defendant.med_pay_limits)} />
-            )}
-            {defendant.property_damage_limits !== null && (
-              <InfoRow label="Prop. Damage" value={formatUSD(defendant.property_damage_limits)} />
-            )}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
+            <InfoRow label="Address" value={defendant.defendant_address} />
+            <InfoRow label="Adjuster" value={defendant.adjuster_name} />
+            <InfoRow label="Adjuster Phone" value={defendant.adjuster_phone} />
+            <InfoRow label="Adjuster Email" value={defendant.adjuster_email} />
+            <InfoRow label="Claim #" value={defendant.claim_number} />
+            <InfoRow label="Policy Limits" value={formatUSD(defendant.policy_limits)} />
+            <InfoRow label="BI Limits" value={formatUSD(defendant.bi_limits)} />
+            <InfoRow label="UM/UIM" value={formatUSD(defendant.um_uim_limits)} />
+            <InfoRow label="Med Pay" value={formatUSD(defendant.med_pay_limits)} />
+            <InfoRow label="Prop. Damage" value={formatUSD(defendant.property_damage_limits)} />
           </div>
 
-          {defendant.defendant_address && (
-            <p className="mt-3 text-xs text-[#6b6b6b]">{defendant.defendant_address}</p>
-          )}
-          {defendant.notes && (
-            <p className="mt-2 rounded-md bg-[#f9f9f9] px-3 py-2 text-sm text-[#2b2b2b]">{defendant.notes}</p>
-          )}
+          <div className="mt-4">
+            <p className="text-xs text-[#9b9b9b]">Notes</p>
+            {defendant.notes ? (
+              <p className="mt-1 rounded-md bg-[#f9f9f9] px-3 py-2 text-sm text-[#2b2b2b]">
+                {defendant.notes}
+              </p>
+            ) : (
+              <p className="mt-1 rounded-md bg-[#f9f9f9] px-3 py-2 text-sm italic text-[#9b9b9b]">
+                No notes added
+              </p>
+            )}
+          </div>
         </>
       ) : (
         <>
@@ -253,12 +263,7 @@ function DefendantCard({
             </button>
             <button
               type="button"
-              onClick={() => {
-                const { id, case_id, created_at, updated_at, ...rest } = defendant
-                setForm(rest)
-                setEditing(false)
-                setError(null)
-              }}
+              onClick={handleCancel}
               className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
             >
               Cancel
@@ -266,15 +271,6 @@ function DefendantCard({
           </div>
         </>
       )}
-    </div>
-  )
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-[#9b9b9b]">{label}</p>
-      <p className="text-sm font-medium text-[#2b2b2b]">{value}</p>
     </div>
   )
 }
@@ -339,7 +335,7 @@ export default function DefendantsTab({ caseId }: Props) {
     setAdding(false)
   }
 
-  async function handleSave(id: string, form: DefendantForm) {
+  async function handleSave(id: string, form: DefendantForm): Promise<string | null> {
     const { data, error } = await supabase
       .from('defendants')
       .update({ ...form, updated_at: new Date().toISOString() })
@@ -347,9 +343,12 @@ export default function DefendantsTab({ caseId }: Props) {
       .select()
       .single()
 
-    if (!error && data) {
-      setDefendants((prev) => prev.map((d) => (d.id === id ? data : d)))
+    if (error || !data) {
+      return error?.message ?? 'Failed to save'
     }
+
+    setDefendants((prev) => prev.map((d) => (d.id === id ? data : d)))
+    return null
   }
 
   async function handleDelete(id: string) {

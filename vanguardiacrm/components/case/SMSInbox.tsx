@@ -137,6 +137,15 @@ export default function SMSInbox({ caseId, clientPhone }: Props) {
     }
   }
 
+  if (!clientPhone) {
+    return (
+      <div className="rounded-xl border border-[#e5e5e5] bg-white px-6 py-10 text-center">
+        <p className="text-sm text-[#6b6b6b]">No phone number on file for this client.</p>
+        <p className="mt-1 text-xs text-[#b9b9b9]">Add a phone number to the case to enable SMS.</p>
+      </div>
+    )
+  }
+
   if (loading) {
     return <p className="text-sm text-[#6b6b6b]">Loading inbox...</p>
   }
@@ -151,10 +160,12 @@ export default function SMSInbox({ caseId, clientPhone }: Props) {
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`inline-flex h-2 w-2 rounded-full ${configured ? 'bg-[#1f7a4d]' : 'bg-[#d9d9d9]'}`}
+            className={`inline-flex h-2 w-2 rounded-full ${
+              configured === null ? 'animate-pulse bg-[#d9d9d9]' : configured ? 'bg-[#1f7a4d]' : 'bg-[#d9d9d9]'
+            }`}
           />
           <span className="text-xs text-[#9b9b9b]">
-            {configured ? 'Active' : 'Not configured'}
+            {configured === null ? 'Checking...' : configured ? 'Active' : 'Not configured'}
           </span>
           <button
             type="button"

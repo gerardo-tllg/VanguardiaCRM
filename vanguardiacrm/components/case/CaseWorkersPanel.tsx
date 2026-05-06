@@ -68,6 +68,7 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
         }
       : EMPTY_FORM
   )
+  const [savedForm, setSavedForm] = useState<WorkerForm>(form)
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
@@ -86,21 +87,13 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
     if (err) {
       setError(err)
     } else {
+      setSavedForm(form)
       setEditing(false)
     }
   }
 
   function handleCancelEdit() {
-    setForm(
-      worker
-        ? {
-            user_name: worker.user_name ?? '',
-            user_email: worker.user_email ?? '',
-            user_phone: worker.user_phone ?? '',
-            notes: worker.notes ?? '',
-          }
-        : EMPTY_FORM
-    )
+    setForm(savedForm)
     setEditing(false)
     setError(null)
   }
@@ -112,6 +105,7 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
     setRemoving(false)
     setConfirmRemove(false)
     setForm(EMPTY_FORM)
+    setSavedForm(EMPTY_FORM)
   }
 
   const isAssigned = worker !== null
@@ -184,23 +178,33 @@ function WorkerCard({ role, worker, onSave, onRemove }: WorkerCardProps) {
         )}
       </div>
 
-      {/* Assigned view */}
+      {/* Assigned read view */}
       {isAssigned && !editing && (
-        <div className="space-y-1">
-          {worker.user_name && (
-            <p className="text-sm font-semibold text-[#2b2b2b]">{worker.user_name}</p>
-          )}
-          {worker.user_email && (
-            <p className="text-xs text-[#555555]">{worker.user_email}</p>
-          )}
-          {worker.user_phone && (
-            <p className="text-xs text-[#555555]">{worker.user_phone}</p>
-          )}
-          {worker.notes && (
-            <p className="mt-2 rounded-md bg-[#f9f9f9] px-2.5 py-1.5 text-xs text-[#6b6b6b]">
-              {worker.notes}
-            </p>
-          )}
+        <div className="space-y-2">
+          <div>
+            <p className="text-xs text-[#9b9b9b]">Name</p>
+            <p className="text-sm font-semibold text-[#2b2b2b]">{worker.user_name ?? '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[#9b9b9b]">Email</p>
+            <p className="text-xs text-[#555555]">{worker.user_email ?? '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[#9b9b9b]">Phone</p>
+            <p className="text-xs text-[#555555]">{worker.user_phone ?? '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[#9b9b9b]">Notes</p>
+            {worker.notes ? (
+              <p className="mt-0.5 rounded-md bg-[#f9f9f9] px-2.5 py-1.5 text-xs text-[#6b6b6b]">
+                {worker.notes}
+              </p>
+            ) : (
+              <p className="mt-0.5 rounded-md bg-[#f9f9f9] px-2.5 py-1.5 text-xs italic text-[#9b9b9b]">
+                No notes added
+              </p>
+            )}
+          </div>
         </div>
       )}
 
