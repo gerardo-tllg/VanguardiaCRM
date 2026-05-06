@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import SettlementWorksheetTab from "@/components/case/SettlementWorksheet";
+import InjuryStatusTab from "@/components/case/InjuryStatusTab";
 
 type PageProps = {
   params: Promise<{ caseId: string }>;
 };
 
-export default async function CaseSettlementPage({ params }: PageProps) {
+export default async function CaseInjuryStatusPage({ params }: PageProps) {
   const { caseId } = await params;
 
   const { data, error } = await supabaseAdmin
@@ -17,5 +17,5 @@ export default async function CaseSettlementPage({ params }: PageProps) {
 
   if (error || !data) notFound();
 
-  return <SettlementWorksheetTab caseId={data.id} />;
+  return <InjuryStatusTab caseId={data.id} />;
 }

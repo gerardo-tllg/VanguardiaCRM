@@ -1,21 +1,27 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import SettlementWorksheetTab from "@/components/case/SettlementWorksheet";
+import StatusPipeline from "@/components/case/StatusPipeline";
+import { CaseStatus } from "@/types/case";
 
 type PageProps = {
   params: Promise<{ caseId: string }>;
 };
 
-export default async function CaseSettlementPage({ params }: PageProps) {
+export default async function CasePipelinePage({ params }: PageProps) {
   const { caseId } = await params;
 
   const { data, error } = await supabaseAdmin
     .from("cases")
-    .select("id")
+    .select("id, case_status")
     .eq("case_number", caseId)
     .single();
 
   if (error || !data) notFound();
 
-  return <SettlementWorksheetTab caseId={data.id} />;
+  return (
+    <StatusPipeline
+      caseId={data.id}
+      currentStatus={(data.case_status as CaseStatus) ?? "intake"}
+    />
+  );
 }

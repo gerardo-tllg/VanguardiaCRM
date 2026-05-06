@@ -4,12 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const sections = [
-  { label: "Overview", slug: "overview" },
-  { label: "Client", slug: "client" },
-  { label: "Incident", slug: "incident" },
-  { label: "Medical Treatment", slug: "medical-treatment" },
-  { label: "Documents", slug: "documents" },
-  { label: "Settlement", slug: "settlement" },
+  { label: "Overview",            slug: "overview"             },
+  { label: "Pipeline",            slug: "pipeline"             },
+  { label: "Client",              slug: "client"               },
+  { label: "Incident",            slug: "incident"             },
+  { label: "Medical Treatment",   slug: "medical-treatment"    },
+  { label: "Injury Status",       slug: "injury-status"        },
+  { label: "Documents",           slug: "documents"            },
+  { label: "Defendants",          slug: "defendants"           },
+  { label: "Case Workers",        slug: "case-workers"         },
+  { label: "Settlement",          slug: "settlement"           },
+  { label: "SMS",                 slug: "sms"                  },
 ];
 
 export default function CaseTabs({ caseNumber }: { caseNumber: string }) {
