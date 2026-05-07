@@ -71,7 +71,7 @@ Via Fax: [ADJUSTER FAX]
 Attn: [ADJUSTER NAME]
 [CARRIER ADDRESS]
 
-Re: Demand for Settlement – [INCIDENT TYPE]
+Re: Demand for Settlement - [INCIDENT TYPE]
 Claim Number: [CLAIM NUMBER]
 Date of Incident: [DATE OF LOSS]
 
@@ -87,25 +87,25 @@ This letter is a formal demand for settlement under your insured's liability cov
 
 Accident Overview
 
-[NARRATIVE OF THE ACCIDENT — use the narrative and liability notes from case data. Write 2-3 clear, assertive paragraphs describing how the accident occurred, the client's role, conditions, and the defendant's fault.]
+[NARRATIVE OF THE ACCIDENT - use the narrative and liability notes from case data. Write 2-3 clear, assertive paragraphs describing how the accident occurred, the client's role, conditions, and the defendant's fault.]
 
 Injuries Sustained
 
 [CLIENT NAME] presented for medical evaluation following the incident. Symptoms included:
 
-[LIST KEY SYMPTOMS AND COMPLAINTS based on injury status data — cervical pain, lumbar pain, headaches, etc.]
+[LIST KEY SYMPTOMS AND COMPLAINTS based on injury status data - cervical pain, lumbar pain, headaches, etc.]
 
 Medical Diagnoses
 
 Following diagnostic imaging and medical evaluations, [CLIENT NAME] received the following diagnoses:
 
-[LIST DIAGNOSES with ICD codes if available — base on MRI status, TBI, injury notes]
+[LIST DIAGNOSES with ICD codes if available - base on MRI status, TBI, injury notes]
 
 Treatment Plan
 
 [CLIENT NAME]'s medical care has included:
 
-[LIST TREATMENTS — base on injection status, surgery status, MRI, ER visit, treatment notes. Include frequency and recommended future treatment if applicable.]
+[LIST TREATMENTS - base on injection status, surgery status, MRI, ER visit, treatment notes. Include frequency and recommended future treatment if applicable.]
 
 Stower's Doctrine and Demand of Settlement
 
@@ -113,7 +113,7 @@ Under your policy, you have a duty to (1) defend the insured against any claim w
 
 Under the Stower's doctrine my client's demand of settlement must propose to fully release the insured in exchange for either a stated sum of money or the "policy limits". The Stower's doctrine also requires my client to offer in the demand of settlement a full and unconditional release of all potential claims including all liens and an amount to settle within policy limits.
 
-We hereby extend on behalf of our client [CLIENT NAME] our demand of settlement for the [DEMAND AMOUNT — use gross settlement target if available, otherwise "limits of your insured's policy"], in exchange for a full and unconditional release of all potential claims against your insured, including all liens.
+We hereby extend on behalf of our client [CLIENT NAME] our demand of settlement for the [DEMAND AMOUNT - use gross settlement target if available, otherwise "limits of your insured's policy"], in exchange for a full and unconditional release of all potential claims against your insured, including all liens.
 
 We kindly request that you respond to this letter within 30 days from the date of receipt. We hope to achieve a prompt and fair resolution to this matter and avoid the necessity of legal action. However, if we do not receive a satisfactory response within the stipulated time frame, we will have no choice but to pursue legal remedies.
 
@@ -176,13 +176,13 @@ ATTORNEY OF RECORD:
 ${attorney ? `${attorney.user_name || 'N/A'}` : 'Not assigned'}
 
 INSTRUCTIONS:
-- Follow the template structure exactly — same sections, same order, same legal language
+- Follow the template structure exactly - same sections, same order, same legal language
 - Replace placeholders with case data above
-- For the adjuster salutation use "Dear Mr./Ms. [Last Name]," — infer gender from name if possible, otherwise use full name
+- For the adjuster salutation use "Dear Mr./Ms. [Last Name]," - infer gender from name if possible, otherwise use full name
 - For the demand amount: if gross settlement target is set use that dollar figure, otherwise demand policy limits
 - For injuries/diagnoses/treatment: use the injury status data to write realistic, specific clinical language consistent with a PI demand letter
 - Do not invent facts not supported by the case data
-- Output only the letter — no preamble, no commentary`
+- Output only the letter - no preamble, no commentary`
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
