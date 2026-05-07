@@ -47,7 +47,14 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    console.log('[demand-letter/generate] Starting stream, prompt length:', prompt.length)
+    const sanitizedPrompt = prompt
+      .replace(/—/g, '--')
+      .replace(/–/g, '-')
+      .replace(/‘|’/g, "'")
+      .replace(/“|”/g, '"')
+      .replace(/[^\x00-\xFF]/g, '')
+
+    console.log('[demand-letter/generate] Starting stream, prompt length:', sanitizedPrompt.length)
 
     const encoder = new TextEncoder()
 
@@ -58,7 +65,7 @@ export async function POST(req: NextRequest) {
             model: 'claude-sonnet-4-6',
             max_tokens: 4000,
             system: SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: prompt }],
+            messages: [{ role: 'user', content: sanitizedPrompt }],
           })
 
           for await (const chunk of anthropicStream) {
