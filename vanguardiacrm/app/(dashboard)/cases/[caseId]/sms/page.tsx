@@ -12,14 +12,14 @@ export default async function CaseSMSPage({ params }: PageProps) {
   const { data, error } = await supabaseAdmin
     .from("cases")
     .select("id, phone")
-    .eq("case_number", caseId)
+    .eq("id", caseId)
     .single();
 
   if (error || !data) notFound();
 
   return (
     <SMSInbox
-      caseId={data.id}
+      caseId={caseId}
       clientPhone={data.phone ?? ""}
     />
   );

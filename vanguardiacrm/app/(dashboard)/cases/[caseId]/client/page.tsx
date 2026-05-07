@@ -12,7 +12,7 @@ export default async function CaseClientPage({ params }: PageProps) {
   const { data: caseRecord, error } = await supabaseAdmin
     .from("cases")
     .select("*")
-    .eq("case_number", caseId)
+    .eq("id", caseId)
     .single();
 
   if (error || !caseRecord) {
@@ -31,7 +31,7 @@ export default async function CaseClientPage({ params }: PageProps) {
 
   return (
     <CaseClientTab
-      caseNumber={caseRecord.case_number}
+      caseNumber={caseId}
       initialData={{
         client_name: caseRecord.client_name ?? "",
         phone: caseRecord.phone ?? "",

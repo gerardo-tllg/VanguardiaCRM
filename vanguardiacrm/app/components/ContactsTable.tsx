@@ -172,10 +172,10 @@ export default function ContactsTable({ contacts = [] }: ContactsTableProps) {
                     </td>
 
                     <td className="px-5 py-4">
-                      {firstCase?.case_number ? (
+                      {firstCase?.id ? (
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
-                            href={`/cases/${firstCase.case_number}/overview`}
+                            href={`/cases/${firstCase.id}/overview`}
                             className="inline-flex rounded-full bg-[#f1f1f1] px-4 py-2 text-sm font-medium text-[#4b0a06] underline underline-offset-2 hover:text-[#5f0d08]"
                           >
                             {firstCase.client_name || getDisplayName(contact)} - {firstCase.case_number}

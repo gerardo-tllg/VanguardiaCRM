@@ -18,7 +18,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await supabaseAdmin
     .from("cases")
-    .select("case_number, client_name")
+    .select("id, case_number, client_name")
     .or(
       `client_name.ilike.%${q}%,case_number.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`
     )

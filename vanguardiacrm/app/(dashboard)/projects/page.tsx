@@ -194,7 +194,7 @@ export default async function ProjectsPage({
                   <td className="px-5 py-4 text-[#2b2b2b]">{formatPersonName(item.client_name)}</td>
                   <td className="px-5 py-4">
                     <Link
-                      href={`/cases/${item.case_number}/overview`}
+                      href={`/cases/${item.id}/overview`}
                       className="text-[#4b0a06] underline"
                     >
                       {formatPersonName(item.client_name)} - {item.case_number}

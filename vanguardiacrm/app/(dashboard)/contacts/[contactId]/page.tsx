@@ -131,7 +131,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
               uniqueCases.map((item) => (
                 <Link
                   key={item!.case.id}
-                  href={`/cases/${item!.case.case_number}/overview`}
+                  href={`/cases/${item!.case.id}/overview`}
                   className="block rounded-lg border border-[#eeeeee] bg-[#fafafa] p-4 hover:bg-[#fcfaf9]"
                 >
                   <div className="font-medium text-[#4b0a06] underline">

@@ -70,7 +70,7 @@ export default async function CaseMedicalTreatmentPage({
   const { data: caseRecord, error: caseError } = await supabaseAdmin
     .from("cases")
     .select("id, case_number, client_name")
-    .eq("case_number", caseId)
+    .eq("id", caseId)
     .single();
 
   if (caseError || !caseRecord) {
@@ -148,7 +148,7 @@ export default async function CaseMedicalTreatmentPage({
 
   return (
     <CaseMedicalProvidersTab
-      caseNumber={caseRecord.case_number}
+      caseNumber={caseId}
       initialCaseProviders={(caseProviders ?? []) as CaseProviderItem[]}
       providerDirectory={(providerDirectory ?? []) as ProviderDirectoryItem[]}
     />

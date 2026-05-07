@@ -20,7 +20,7 @@ export default async function CaseLayout({
   const { data: caseRecord, error: caseError } = await supabaseAdmin
     .from("cases")
     .select("*")
-    .eq("case_number", caseId)
+    .eq("id", caseId)
     .single();
 
   if (caseError || !caseRecord) {
@@ -58,7 +58,7 @@ export default async function CaseLayout({
       : {};
 
   const caseData = {
-  id: caseRecord.case_number,
+  id: caseRecord.id,
   clientName: caseRecord.client_name ?? "Unknown Client",
   dateOfIncident:
     caseRecord.accident_date ??
@@ -77,7 +77,7 @@ export default async function CaseLayout({
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f5f5]">
       <CaseHeader caseData={caseData} />
-      <CaseTabs caseNumber={caseRecord.case_number} />
+      <CaseTabs caseNumber={caseId} />
 
       <div className="flex flex-1 gap-6 p-6">
         <main className="min-w-0 flex-1">{children}</main>

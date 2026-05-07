@@ -96,7 +96,7 @@ export default async function CaseOverviewPage({ params }: PageProps) {
   const { data: caseRecord, error } = await supabaseAdmin
     .from("cases")
     .select("*")
-    .eq("case_number", caseId)
+    .eq("id", caseId)
     .single();
 
   if (error || !caseRecord) {

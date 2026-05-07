@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type CaseSearchResult = {
+  id: string;
   case_number: string;
   client_name: string | null;
   case_type: string | null;
@@ -66,11 +67,11 @@ export default function GlobalCaseSearch() {
     return () => clearTimeout(timeout);
   }, [query]);
 
-  function handleSelect(caseNumber: string) {
+  function handleSelect(caseId: string) {
     setQuery("");
     setResults([]);
     setOpen(false);
-    router.push(`/cases/${caseNumber}/overview`);
+    router.push(`/cases/${caseId}/overview`);
   }
 
   return (
@@ -97,9 +98,9 @@ export default function GlobalCaseSearch() {
           {results.length > 0 ? (
             results.map((item) => (
               <button
-                key={item.case_number}
+                key={item.id}
                 type="button"
-                onClick={() => handleSelect(item.case_number)}
+                onClick={() => handleSelect(item.id)}
                 className="block w-full border-b border-[#eeeeee] px-4 py-3 text-left hover:bg-[#fcfaf9] last:border-b-0"
               >
                 <div className="text-sm font-semibold text-[#2b2b2b]">

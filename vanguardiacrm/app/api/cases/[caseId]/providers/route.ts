@@ -27,7 +27,7 @@ export async function POST(req: Request, context: RouteContext) {
     const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
       .select("id, case_number")
-      .eq("case_number", caseId)
+      .eq("id", caseId)
       .single();
 
     if (caseError || !caseRecord) {

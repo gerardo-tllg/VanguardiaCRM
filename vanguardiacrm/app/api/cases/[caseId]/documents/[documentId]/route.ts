@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
       .select("id, case_number")
-      .eq("case_number", caseId)
+      .eq("id", caseId)
       .single();
 
     if (caseError || !caseRecord) {
@@ -89,7 +89,7 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
     const { data: caseRecord, error: caseError } = await supabaseAdmin
       .from("cases")
       .select("id, case_number")
-      .eq("case_number", caseId)
+      .eq("id", caseId)
       .single();
 
     if (caseError || !caseRecord) {

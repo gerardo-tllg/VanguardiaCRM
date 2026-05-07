@@ -20,7 +20,7 @@ export async function PATCH(req: Request, context: RouteContext) {
     const { data: existingCase, error: fetchError } = await supabaseAdmin
       .from("cases")
       .select("*")
-      .eq("case_number", caseId)
+      .eq("id", caseId)
       .single();
 
     if (fetchError || !existingCase) {
@@ -89,7 +89,7 @@ export async function PATCH(req: Request, context: RouteContext) {
       .update({
         raw_payload: nextRaw,
       })
-      .eq("case_number", caseId)
+      .eq("id", caseId)
       .select("id, case_number");
 
     if (updateError) {
@@ -112,7 +112,7 @@ export async function PATCH(req: Request, context: RouteContext) {
     const { data: updatedCase, error: refetchError } = await supabaseAdmin
       .from("cases")
       .select("*")
-      .eq("case_number", caseId)
+      .eq("id", caseId)
       .single();
 
     if (refetchError || !updatedCase) {

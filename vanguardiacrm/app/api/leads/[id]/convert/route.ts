@@ -140,7 +140,7 @@ export async function POST(_req: Request, context: RouteContext) {
         {
           success: true,
           case: existingCase,
-          redirectTo: `/cases/${existingCase.case_number}/overview`,
+          redirectTo: `/cases/${existingCase.id}/overview`,
         },
         { status: 200 }
       );
@@ -362,7 +362,7 @@ export async function POST(_req: Request, context: RouteContext) {
       {
         success: true,
         case: newCase,
-        redirectTo: `/cases/${newCase.case_number}/overview`,
+        redirectTo: `/cases/${newCase.id}/overview`,
       },
       { status: 200 }
     );

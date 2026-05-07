@@ -13,14 +13,14 @@ export default async function CasePipelinePage({ params }: PageProps) {
   const { data, error } = await supabaseAdmin
     .from("cases")
     .select("id, case_status")
-    .eq("case_number", caseId)
+    .eq("id", caseId)
     .single();
 
   if (error || !data) notFound();
 
   return (
     <StatusPipeline
-      caseId={data.id}
+      caseId={caseId}
       currentStatus={(data.case_status as CaseStatus) ?? "intake"}
     />
   );
