@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -461,7 +461,7 @@ export default function DemandLetterTab({ caseId }: Props) {
             </div>
             <div className="space-y-1 text-center">
               <p className="text-sm font-medium text-[#2b2b2b]">Drafting your demand letter</p>
-              <p className="text-xs text-[#9b9b9b]">This usually takes 15–30 seconds</p>
+              <p className="text-xs text-[#9b9b9b]">This usually takes 15-30 seconds</p>
             </div>
             <div className="w-64 space-y-2 pt-2">
               <div className="h-2 w-full animate-pulse rounded-full bg-[#f0f0f0]" />
@@ -564,13 +564,13 @@ export default function DemandLetterTab({ caseId }: Props) {
             <div>
               <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">Generated</p>
               <p className="text-sm text-[#2b2b2b]">
-                {letter.generated_at ? formatDate(letter.generated_at) : '—'}
+                {letter.generated_at ? formatDate(letter.generated_at) : '--'}
               </p>
             </div>
             <div>
               <p className="mb-0.5 text-xs font-medium text-[#6b6b6b]">Last Saved</p>
               <p className="text-sm text-[#2b2b2b]">
-                {letter.last_saved_at ? formatDate(letter.last_saved_at) : '—'}
+                {letter.last_saved_at ? formatDate(letter.last_saved_at) : '--'}
               </p>
             </div>
           </div>
