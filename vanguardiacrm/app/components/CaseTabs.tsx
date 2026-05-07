@@ -14,6 +14,7 @@ const sections = [
   { label: "Defendants",          slug: "defendants"           },
   { label: "Case Workers",        slug: "case-workers"         },
   { label: "Settlement",          slug: "settlement"           },
+  { label: "Demand Letter",       slug: "demand-letter"        },
   { label: "SMS",                 slug: "sms"                  },
 ];
 
