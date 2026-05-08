@@ -10,13 +10,10 @@ export async function POST(req: Request) {
 
     const sid = process.env.TWILIO_ACCOUNT_SID
     const token = process.env.TWILIO_AUTH_TOKEN
-    const from = process.env.TWILIO_PHONE_NUMBER
+    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID
+    const from = process.env.TWILIO_INTAKE_NUMBER
 
-    if (
-      !sid || sid === 'your_twilio_account_sid' ||
-      !token || token === 'your_twilio_auth_token' ||
-      !from || from === 'your_twilio_phone_number'
-    ) {
+    if (!sid || !token || (!messagingServiceSid && !from)) {
       return NextResponse.json(
         { success: false, error: 'Twilio not configured' },
         { status: 503 }
@@ -39,11 +36,11 @@ export async function POST(req: Request) {
 
     const client = twilio(sid, token)
 
-    const sent = await client.messages.create({
-      body: message.trim(),
-      from,
-      to,
-    })
+    const sent = await client.messages.create(
+      messagingServiceSid
+        ? { body: message.trim(), messagingServiceSid, to }
+        : { body: message.trim(), from, to }
+    )
 
     const { error: dbError } = await supabaseAdmin.from('sms_messages').insert({
       case_id,
