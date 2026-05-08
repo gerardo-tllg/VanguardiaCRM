@@ -284,7 +284,6 @@ export default function DemandLetterTab({ caseId }: Props) {
       })
 
       console.log('[DemandLetterTab] Response status:', res.status, res.ok)
-      console.log('[DemandLetterTab] Response ok, reading stream')
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         setGenerateError(body.error ?? 'Generation failed. Please try again.')
@@ -292,30 +291,14 @@ export default function DemandLetterTab({ caseId }: Props) {
         return
       }
 
-      const reader = res.body?.getReader()
-      if (!reader) {
-        setGenerateError('Failed to read response stream.')
-        setGenerating(false)
-        return
+      console.log('[DemandLetterTab] Response ok, reading stream')
+      console.log('[DemandLetterTab] response.body exists:', !!res.body)
+      const fullText = await res.text()
+      console.log('[DemandLetterTab] Full text length:', fullText.length, 'preview:', fullText.slice(0, 100))
+      if (fullText.includes('__ERROR__:')) {
+        throw new Error(fullText.split('__ERROR__:')[1].trim())
       }
-
-      const decoder = new TextDecoder()
-      let accumulated = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        accumulated += decoder.decode(value, { stream: true })
-      }
-
-      if (accumulated.includes('__ERROR__:')) {
-        const msg = accumulated.split('__ERROR__:')[1]?.trim()
-        setGenerateError(msg || 'Generation failed. Please try again.')
-        setGenerating(false)
-        return
-      }
-
-      console.log('[DemandLetterTab] Full text length:', accumulated.length, 'preview:', accumulated.slice(0, 100))
-      generatedContent = accumulated
+      generatedContent = fullText
     } catch (err) {
       console.error('[DemandLetterTab] Caught error:', err)
       setGenerateError('Network error. Please try again.')
