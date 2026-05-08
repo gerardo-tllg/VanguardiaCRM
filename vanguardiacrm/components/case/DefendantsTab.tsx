@@ -17,6 +17,7 @@ const EMPTY_FORM: DefendantForm = {
   adjuster_name: null,
   adjuster_phone: null,
   adjuster_email: null,
+  adjuster_fax: null,
   claim_number: null,
   policy_limits: null,
   bi_limits: null,
@@ -55,6 +56,7 @@ const FIELDS: FieldConfig[] = [
   { key: 'claim_number', label: 'Claim Number', type: 'text' },
   { key: 'adjuster_name', label: 'Adjuster Name', type: 'text' },
   { key: 'adjuster_phone', label: 'Adjuster Phone', type: 'tel' },
+  { key: 'adjuster_fax', label: 'Adjuster Fax', type: 'tel' },
   { key: 'adjuster_email', label: 'Adjuster Email', type: 'email' },
   { key: 'policy_limits', label: 'Policy Limits', type: 'currency' },
   { key: 'bi_limits', label: 'Bodily Injury (BI) Limits', type: 'currency' },
@@ -249,6 +251,7 @@ function DefendantCard({
             <InfoRow label="Address" value={defendant.defendant_address} />
             <InfoRow label="Adjuster" value={defendant.adjuster_name} />
             <InfoRow label="Adjuster Phone" value={defendant.adjuster_phone} />
+            <InfoRow label="Adjuster Fax" value={defendant.adjuster_fax} />
             <InfoRow label="Adjuster Email" value={defendant.adjuster_email} />
             <InfoRow label="Claim #" value={defendant.claim_number} />
             <InfoRow label="Policy Limits" value={formatUSD(defendant.policy_limits)} />

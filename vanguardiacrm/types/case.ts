@@ -116,6 +116,7 @@ export type Defendant = {
   adjuster_name: string | null
   adjuster_phone: string | null
   adjuster_email: string | null
+  adjuster_fax: string | null
   claim_number: string | null
   policy_limits: number | null
   bi_limits: number | null
