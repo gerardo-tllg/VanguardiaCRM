@@ -175,34 +175,25 @@ function isSignatureBlock(line: string): boolean {
   )
 }
 
-function signatureStyle(line: string) {
-  const t = line.trim()
-  if (t === 'Respectfully,') return styles.signatureRespectfully
-  if (t === 'The Lopez Law Group') return styles.signatureFirm
-  if (t === 'Fernando J. Lopez') return styles.signatureName
-  if (t === 'Attorney at Law') return styles.signatureTitle
-  return styles.boldLine
-}
-
 export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLetterPDFProps) {
   const lines = content.split('\n')
 
-  // Pre-scan for date line (first non-empty line) and Via Fax line
+  // Pre-scan: date line (first non-empty) and Via Fax line
   let dateIdx = -1
   let viaFaxIdx = -1
   for (let j = 0; j < lines.length; j++) {
-    if (lines[j].trim() && dateIdx === -1) {
-      dateIdx = j
-      continue
-    }
-    if (isViaFax(lines[j]) && viaFaxIdx === -1) {
-      viaFaxIdx = j
-      break
-    }
+    if (lines[j].trim() && dateIdx === -1) { dateIdx = j; continue }
+    if (isViaFax(lines[j]) && viaFaxIdx === -1) { viaFaxIdx = j; break }
   }
   const dateLine = dateIdx >= 0 ? lines[dateIdx].trim() : ''
   const viaFaxLine = viaFaxIdx >= 0 ? lines[viaFaxIdx].trim() : ''
   const skipIndices = new Set([dateIdx, viaFaxIdx].filter(n => n >= 0))
+
+  // Pre-scan: find "Respectfully," to know where signature block starts
+  let sigStartIdx = -1
+  for (let j = 0; j < lines.length; j++) {
+    if (lines[j].trim() === 'Respectfully,') { sigStartIdx = j; break }
+  }
 
   return (
     <Document>
@@ -226,29 +217,40 @@ export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLet
 
             while (i < lines.length) {
               // Skip lines already rendered in the date row
-              if (skipIndices.has(i)) {
-                i++
-                continue
-              }
+              if (skipIndices.has(i)) { i++; continue }
 
               const line = lines[i]
               const trimmed = line.trim()
 
+              // Empty line spacer
               if (!trimmed) {
                 elements.push(<Text key={i} style={styles.spacer}>{' '}</Text>)
                 i++
                 continue
               }
 
+              // Signature block — render all four lines as one unbreakable unit
+              if (i === sigStartIdx) {
+                elements.push(
+                  <View key={`sig-${i}`} wrap={false} minPresenceAhead={100}>
+                    <Text style={styles.signatureRespectfully}>Respectfully,</Text>
+                    <Text style={styles.signatureFirm}>The Lopez Law Group</Text>
+                    <Text style={styles.signatureName}>Fernando J. Lopez</Text>
+                    <Text style={styles.signatureTitle}>Attorney at Law</Text>
+                  </View>
+                )
+                i += 4
+                continue
+              }
+
+              // Skip any remaining individual signature lines (in case i landed mid-block)
+              if (isSignatureBlock(line)) { i++; continue }
+
               // Section heading — wrap with next paragraph to prevent orphans
               if (isHeading(trimmed)) {
                 const headingText = trimmed
                 i++
-
-                // Skip blank lines between heading and next content
                 while (i < lines.length && !lines[i].trim()) i++
-
-                // Collect the immediately following paragraph lines
                 const nextParaLines: string[] = []
                 while (
                   i < lines.length &&
@@ -262,7 +264,6 @@ export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLet
                   nextParaLines.push(lines[i].trim())
                   i++
                 }
-
                 elements.push(
                   <View key={`heading-${i}`} wrap={false}>
                     <Text style={styles.sectionHeading}>{headingText}</Text>
@@ -292,18 +293,13 @@ export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLet
                 continue
               }
 
-              if (isSignatureBlock(line)) {
-                elements.push(<Text key={i} style={signatureStyle(line)}>{trimmed}</Text>)
-                i++
-                continue
-              }
-
               // Regular paragraph — collect consecutive non-special lines
               const paragraphLines: string[] = []
               while (
                 i < lines.length &&
                 lines[i].trim() &&
                 !skipIndices.has(i) &&
+                i !== sigStartIdx &&
                 !isHeading(lines[i].trim()) &&
                 !isHeaderLine(lines[i]) &&
                 !isListItem(lines[i]) &&
@@ -313,11 +309,13 @@ export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLet
                 paragraphLines.push(lines[i].trim())
                 i++
               }
-              elements.push(
-                <Text key={i + '-p'} style={styles.paragraph}>
-                  {paragraphLines.join(' ')}
-                </Text>
-              )
+              if (paragraphLines.length > 0) {
+                elements.push(
+                  <Text key={i + '-p'} style={styles.paragraph}>
+                    {paragraphLines.join(' ')}
+                  </Text>
+                )
+              }
             }
 
             return elements
