@@ -43,6 +43,12 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" })
 }
 
+type CaseOption = {
+  id: string
+  client_name: string | null
+  case_number: string | null
+}
+
 export default function MessagesWorkspace() {
   const supabase = useMemo(() => createClient(), [])
 
@@ -55,6 +61,16 @@ export default function MessagesWorkspace() {
   const [loading, setLoading] = useState(true)
   const [threadLoading, setThreadLoading] = useState(false)
   const [unread, setUnread] = useState<Record<string, number>>({})
+
+  // New message modal
+  const [showNewMsg, setShowNewMsg] = useState(false)
+  const [caseOptions, setCaseOptions] = useState<CaseOption[]>([])
+  const [casesLoading, setCasesLoading] = useState(false)
+  const [newPhone, setNewPhone] = useState("")
+  const [newCaseId, setNewCaseId] = useState("")
+  const [newMessage, setNewMessage] = useState("")
+  const [newSending, setNewSending] = useState(false)
+  const [newError, setNewError] = useState<string | null>(null)
 
   const selectedCaseIdRef = useRef<string | null>(null)
   selectedCaseIdRef.current = selectedCaseId
@@ -120,6 +136,67 @@ export default function MessagesWorkspace() {
       }))
     )
   }, [supabase])
+
+  const fetchCases = useCallback(async () => {
+    setCasesLoading(true)
+    const { data, error } = await supabase
+      .from("cases")
+      .select("id, client_name, case_number")
+      .order("client_name", { ascending: true })
+    setCasesLoading(false)
+    if (error) {
+      console.error("Failed to fetch cases:", error.message)
+      return
+    }
+    setCaseOptions((data ?? []) as CaseOption[])
+  }, [supabase])
+
+  function openNewMsg() {
+    setShowNewMsg(true)
+    setNewPhone("")
+    setNewCaseId("")
+    setNewMessage("")
+    setNewError(null)
+    if (caseOptions.length === 0) fetchCases()
+  }
+
+  function closeNewMsg() {
+    setShowNewMsg(false)
+  }
+
+  async function handleNewSend() {
+    if (!newPhone.trim() || !newMessage.trim()) {
+      setNewError("Phone number and message are required.")
+      return
+    }
+    setNewSending(true)
+    setNewError(null)
+
+    try {
+      const res = await fetch("/api/sms/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          case_id: newCaseId || null,
+          to: newPhone.trim(),
+          message: newMessage.trim(),
+        }),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok || !json.success) {
+        setNewError(json.error ?? "Failed to send message.")
+        return
+      }
+
+      await fetchConversations()
+      if (newCaseId) setSelectedCaseId(newCaseId)
+      closeNewMsg()
+    } finally {
+      setNewSending(false)
+    }
+  }
 
   // Initial load
   useEffect(() => {
@@ -227,11 +304,103 @@ export default function MessagesWorkspace() {
   }
 
   return (
+    <>
+    {/* New Message Modal */}
+    {showNewMsg && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+          <div className="border-b border-[#e5e5e5] px-6 py-4">
+            <h3 className="text-base font-semibold text-[#2b2b2b]">New Message</h3>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            {newError && (
+              <p className="text-xs text-red-600">{newError}</p>
+            )}
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[#555555]">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                placeholder="+19561234567"
+                className="w-full rounded-md border border-[#d9d9d9] px-4 py-2.5 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[#555555]">
+                Case <span className="text-[#8a8a8a] font-normal">(optional)</span>
+              </label>
+              <select
+                value={newCaseId}
+                onChange={(e) => {
+                  setNewCaseId(e.target.value)
+                  const chosen = caseOptions.find((c) => c.id === e.target.value)
+                  if (chosen && !newPhone) {
+                    // phone is on the case but not in this select — left for user to fill
+                  }
+                }}
+                disabled={casesLoading}
+                className="w-full rounded-md border border-[#d9d9d9] px-4 py-2.5 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06] bg-white disabled:opacity-50"
+              >
+                <option value="">-- Select a case --</option>
+                {caseOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.client_name ?? "Unknown"}{c.case_number ? ` - ${c.case_number}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[#555555]">
+                Message
+              </label>
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type your message..."
+                rows={4}
+                className="w-full resize-none rounded-md border border-[#d9d9d9] px-4 py-2.5 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-[#e5e5e5] px-6 py-4">
+            <button
+              onClick={closeNewMsg}
+              disabled={newSending}
+              className="rounded-md border border-[#d9d9d9] px-5 py-2.5 text-sm font-medium text-[#4b0a06] hover:bg-[#fdf6f5] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleNewSend}
+              disabled={newSending || !newPhone.trim() || !newMessage.trim()}
+              className="rounded-md bg-[#4b0a06] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#5f0d08] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {newSending ? "Sending..." : "Send"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="grid grid-cols-12 gap-6">
       {/* Sidebar */}
       <div className="col-span-3 rounded-xl border border-[#e5e5e5] bg-white overflow-hidden">
-        <div className="border-b border-[#e5e5e5] px-4 py-3">
+        <div className="border-b border-[#e5e5e5] px-4 py-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[#2b2b2b]">Conversations</h2>
+          <button
+            onClick={openNewMsg}
+            className="rounded-md bg-[#4b0a06] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#5f0d08]"
+          >
+            + New
+          </button>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto">
@@ -371,5 +540,6 @@ export default function MessagesWorkspace() {
         )}
       </div>
     </div>
+    </>
   )
 }
