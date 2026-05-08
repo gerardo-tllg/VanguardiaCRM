@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    console.log('[demand-letter/generate] API key present:', !!process.env.ANTHROPIC_API_KEY, 'length:', process.env.ANTHROPIC_API_KEY?.length)
+
     const sanitizedPrompt = prompt
       .replace(/—/g, '--')
       .replace(/–/g, '-')
