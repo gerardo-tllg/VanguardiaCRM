@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -10,113 +10,39 @@ const SYSTEM_PROMPT =
 
 export async function POST(req: NextRequest) {
   try {
-    let prompt: string
-
-    try {
-      const body = await req.json()
-      console.log('[demand-letter/generate] Incoming body:', {
-        hasPrompt: !!body?.prompt,
-        promptLength: typeof body?.prompt === 'string' ? body.prompt.length : null,
-        promptPreview: typeof body?.prompt === 'string' ? body.prompt.slice(0, 200) : body?.prompt,
-      })
-      prompt = body?.prompt
-    } catch (err) {
-      console.error('[demand-letter/generate] Failed to parse request body:', {
-        message: err instanceof Error ? err.message : err,
-        stack: err instanceof Error ? err.stack : undefined,
-      })
-      return new Response(JSON.stringify({ error: 'Invalid request body.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const body = await req.json()
+    const prompt: string = body?.prompt
 
     if (!prompt || typeof prompt !== 'string') {
-      console.error('[demand-letter/generate] Missing or invalid prompt field:', { prompt })
-      return new Response(JSON.stringify({ error: 'Missing required field: prompt.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return NextResponse.json({ error: 'Missing required field: prompt.' }, { status: 400 })
     }
 
     if (!process.env.ANTHROPIC_API_KEY) {
-      console.error('[demand-letter/generate] ANTHROPIC_API_KEY is not set')
-      return new Response(JSON.stringify({ error: 'Server configuration error.' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 })
     }
 
-    console.log('[demand-letter/generate] API key present:', !!process.env.ANTHROPIC_API_KEY, 'length:', process.env.ANTHROPIC_API_KEY?.length)
-
     const sanitizedPrompt = prompt
-      .replace(/—/g, '--')
-      .replace(/–/g, '-')
-      .replace(/‘|’/g, "'")
-      .replace(/“|”/g, '"')
-      .replace(/[^\x00-\xFF]/g, '')
+      .replace(/—/g, ‘--’)
+      .replace(/–/g, ‘-’)
+      .replace(/[‘’]/g, “’”)
+      .replace(/[“”]/g, ‘”’)
+      .replace(/[^\x00-\x7F]/g, ‘’)
 
-    console.log('[demand-letter/generate] Starting stream, prompt length:', sanitizedPrompt.length)
-
-    const encoder = new TextEncoder()
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          const anthropicStream = await client.messages.stream({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 4000,
-            system: SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: sanitizedPrompt }],
-          })
-
-          for await (const chunk of anthropicStream) {
-            if (
-              chunk.type === 'content_block_delta' &&
-              chunk.delta.type === 'text_delta'
-            ) {
-              controller.enqueue(encoder.encode(chunk.delta.text))
-            }
-          }
-
-          console.log('[demand-letter/generate] Stream completed successfully')
-          controller.close()
-        } catch (err) {
-          console.error('[demand-letter/generate] Streaming error:', {
-            message: err instanceof Error ? err.message : err,
-            stack: err instanceof Error ? err.stack : undefined,
-            isApiError: err instanceof Anthropic.APIError,
-            status: err instanceof Anthropic.APIError ? err.status : undefined,
-            error: err instanceof Anthropic.APIError ? err.error : undefined,
-          })
-          const message =
-            err instanceof Anthropic.APIError
-              ? err.message
-              : 'An unexpected error occurred.'
-          controller.enqueue(
-            encoder.encode(`\n\n__ERROR__: ${message}`)
-          )
-          controller.close()
-        }
-      },
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: sanitizedPrompt }],
     })
 
-    return new Response(stream, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Transfer-Encoding': 'chunked',
-        'X-Content-Type-Options': 'nosniff',
-      },
-    })
+    const content = message.content
+      .filter((block) => block.type === 'text')
+      .map((block) => (block as { type: 'text'; text: string }).text)
+      .join('')
+
+    return NextResponse.json({ content })
   } catch (err) {
-    console.error('[demand-letter/generate] Unhandled handler error:', {
-      message: err instanceof Error ? err.message : err,
-      stack: err instanceof Error ? err.stack : undefined,
-    })
-    return new Response(JSON.stringify({ error: 'Internal server error.' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    console.error('[demand-letter/generate] Error:', err)
+    return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 })
   }
 }
