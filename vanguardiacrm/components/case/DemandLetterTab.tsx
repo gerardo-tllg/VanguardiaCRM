@@ -204,6 +204,9 @@ function SparkleIcon({ className }: { className?: string }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function DemandLetterTab({ caseId }: Props) {
+  console.log('[DemandLetterTab] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 20))
+  console.log('[DemandLetterTab] Anon key present:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+
   const supabase = useMemo(() => createClient(), [])
 
   const [letter, setLetter] = useState<DemandLetter | null>(null)
