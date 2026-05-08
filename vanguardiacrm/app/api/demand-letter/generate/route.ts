@@ -22,12 +22,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 })
     }
 
-    const sanitizedPrompt = prompt
-      .replace(/\u2014/g, '--')
-      .replace(/\u2013/g, '-')
-      .replace(/[\u2018\u2019]/g, "'")
-      .replace(/[\u201C\u201D]/g, '"')
-      .replace(/[^\x00-\x7F]/g, '')
+    const sanitizedPrompt = prompt.replace(/[^\x00-\x7F]/g, '')
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
