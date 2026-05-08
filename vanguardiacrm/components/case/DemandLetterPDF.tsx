@@ -26,8 +26,6 @@ const SECTION_HEADINGS = [
 ]
 
 const HEADER_LINES = [
-  /^Via Fax:/i,
-  /^Via fax:/i,
   /^Claim Number:/i,
   /^Date of Incident:/i,
   /^Client:/i,
@@ -74,6 +72,11 @@ const styles = StyleSheet.create({
     height: 70,
     objectFit: 'contain',
   },
+  dateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   paragraph: {
     marginBottom: 10,
     lineHeight: 1.4,
@@ -109,6 +112,28 @@ const styles = StyleSheet.create({
   spacer: {
     marginBottom: 2,
   },
+  signatureRespectfully: {
+    fontFamily: 'Times-Roman',
+    fontSize: 11,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  signatureFirm: {
+    fontFamily: 'Times-Bold',
+    fontSize: 11,
+    color: '#c8922a',
+    marginBottom: 2,
+  },
+  signatureName: {
+    fontFamily: 'Times-BoldItalic',
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  signatureTitle: {
+    fontFamily: 'Times-Bold',
+    fontSize: 11,
+    textDecoration: 'underline',
+  },
 })
 
 interface DemandLetterPDFProps {
@@ -125,6 +150,10 @@ function isHeading(line: string): boolean {
 
 function isHeaderLine(line: string): boolean {
   return HEADER_LINES.some(r => r.test(line.trim()))
+}
+
+function isViaFax(line: string): boolean {
+  return /^Via Fax:/i.test(line.trim())
 }
 
 function isListItem(line: string): boolean {
@@ -146,8 +175,34 @@ function isSignatureBlock(line: string): boolean {
   )
 }
 
+function signatureStyle(line: string) {
+  const t = line.trim()
+  if (t === 'Respectfully,') return styles.signatureRespectfully
+  if (t === 'The Lopez Law Group') return styles.signatureFirm
+  if (t === 'Fernando J. Lopez') return styles.signatureName
+  if (t === 'Attorney at Law') return styles.signatureTitle
+  return styles.boldLine
+}
+
 export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLetterPDFProps) {
   const lines = content.split('\n')
+
+  // Pre-scan for date line (first non-empty line) and Via Fax line
+  let dateIdx = -1
+  let viaFaxIdx = -1
+  for (let j = 0; j < lines.length; j++) {
+    if (lines[j].trim() && dateIdx === -1) {
+      dateIdx = j
+      continue
+    }
+    if (isViaFax(lines[j]) && viaFaxIdx === -1) {
+      viaFaxIdx = j
+      break
+    }
+  }
+  const dateLine = dateIdx >= 0 ? lines[dateIdx].trim() : ''
+  const viaFaxLine = viaFaxIdx >= 0 ? lines[viaFaxIdx].trim() : ''
+  const skipIndices = new Set([dateIdx, viaFaxIdx].filter(n => n >= 0))
 
   return (
     <Document>
@@ -157,11 +212,25 @@ export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLet
         </View>
 
         <View>
+          {/* Date / Via Fax row */}
+          {(dateLine || viaFaxLine) && (
+            <View style={styles.dateRow}>
+              <Text style={styles.paragraph}>{dateLine}</Text>
+              {viaFaxLine ? <Text style={styles.paragraph}>{viaFaxLine}</Text> : null}
+            </View>
+          )}
+
           {(() => {
             const elements: React.ReactNode[] = []
             let i = 0
 
             while (i < lines.length) {
+              // Skip lines already rendered in the date row
+              if (skipIndices.has(i)) {
+                i++
+                continue
+              }
+
               const line = lines[i]
               const trimmed = line.trim()
 
@@ -171,9 +240,37 @@ export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLet
                 continue
               }
 
+              // Section heading — wrap with next paragraph to prevent orphans
               if (isHeading(trimmed)) {
-                elements.push(<Text key={i} style={styles.sectionHeading}>{trimmed}</Text>)
+                const headingText = trimmed
                 i++
+
+                // Skip blank lines between heading and next content
+                while (i < lines.length && !lines[i].trim()) i++
+
+                // Collect the immediately following paragraph lines
+                const nextParaLines: string[] = []
+                while (
+                  i < lines.length &&
+                  lines[i].trim() &&
+                  !isHeading(lines[i].trim()) &&
+                  !isHeaderLine(lines[i]) &&
+                  !isListItem(lines[i]) &&
+                  !isSalutation(lines[i]) &&
+                  !isSignatureBlock(lines[i])
+                ) {
+                  nextParaLines.push(lines[i].trim())
+                  i++
+                }
+
+                elements.push(
+                  <View key={`heading-${i}`} wrap={false}>
+                    <Text style={styles.sectionHeading}>{headingText}</Text>
+                    {nextParaLines.length > 0 && (
+                      <Text style={styles.paragraph}>{nextParaLines.join(' ')}</Text>
+                    )}
+                  </View>
+                )
                 continue
               }
 
@@ -196,15 +293,17 @@ export function DemandLetterPDF({ content, letterheadUrl, footerUrl }: DemandLet
               }
 
               if (isSignatureBlock(line)) {
-                elements.push(<Text key={i} style={styles.boldLine}>{trimmed}</Text>)
+                elements.push(<Text key={i} style={signatureStyle(line)}>{trimmed}</Text>)
                 i++
                 continue
               }
 
+              // Regular paragraph — collect consecutive non-special lines
               const paragraphLines: string[] = []
               while (
                 i < lines.length &&
                 lines[i].trim() &&
+                !skipIndices.has(i) &&
                 !isHeading(lines[i].trim()) &&
                 !isHeaderLine(lines[i]) &&
                 !isListItem(lines[i]) &&
