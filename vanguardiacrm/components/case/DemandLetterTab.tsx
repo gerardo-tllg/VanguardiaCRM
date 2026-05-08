@@ -291,14 +291,11 @@ export default function DemandLetterTab({ caseId }: Props) {
         return
       }
 
-      console.log('[DemandLetterTab] Response ok, reading stream')
-      console.log('[DemandLetterTab] response.body exists:', !!res.body)
-      const fullText = await res.text()
-      console.log('[DemandLetterTab] Full text length:', fullText.length, 'preview:', fullText.slice(0, 100))
-      if (fullText.includes('__ERROR__:')) {
-        throw new Error(fullText.split('__ERROR__:')[1].trim())
+      const json = await res.json()
+      if (!json.content) {
+        throw new Error(json.error ?? 'Generation failed. Please try again.')
       }
-      generatedContent = fullText
+      generatedContent = json.content
     } catch (err) {
       console.error('[DemandLetterTab] Caught error:', err)
       setGenerateError('Network error. Please try again.')
