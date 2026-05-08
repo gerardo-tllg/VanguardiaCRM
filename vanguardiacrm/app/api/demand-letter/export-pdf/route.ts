@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const element = React.createElement(DemandLetterPDF, { content, letterheadUrl, footerUrl })
     const buffer = await renderToBuffer(element as React.ReactElement<any>)
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
