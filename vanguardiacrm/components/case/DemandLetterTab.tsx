@@ -8,19 +8,19 @@ type Props = { caseId: string }
 
 type CaseData = {
   client_name: string | null
-  dob: string | null
-  address_line_1: string | null
-  address_line_2: string | null
-  city: string | null
-  state: string | null
-  zip: string | null
+  phone: string | null
+  email: string | null
   accident_date: string | null
-  incident_type: string | null
-  location: string | null
+  accident_location: string | null
   client_role: string | null
   conditions: string | null
-  narrative: string | null
-  liability_notes: string | null
+  accident_description: string | null
+  at_fault_insurer: string | null
+  at_fault_adjuster_name: string | null
+  at_fault_adjuster_phone: string | null
+  at_fault_adjuster_email: string | null
+  at_fault_claim_number: string | null
+  at_fault_policy_limits: string | null
 }
 
 type DemandLetter = {
@@ -134,17 +134,23 @@ Today's Date: ${today}
 
 CLIENT:
 Name: ${caseData?.client_name || 'N/A'}
-Date of Birth: ${caseData?.dob || 'N/A'}
-Address: ${[caseData?.address_line_1, caseData?.city, caseData?.state, caseData?.zip].filter(Boolean).join(', ') || 'N/A'}
+Phone: ${caseData?.phone || 'N/A'}
+Email: ${caseData?.email || 'N/A'}
 
 INCIDENT:
 Date of Loss: ${caseData?.accident_date || 'N/A'}
-Type: ${caseData?.incident_type || 'N/A'}
-Location: ${caseData?.location || 'N/A'}
+Location: ${caseData?.accident_location || 'N/A'}
 Client Role: ${caseData?.client_role || 'N/A'}
 Conditions: ${caseData?.conditions || 'N/A'}
-Narrative: ${caseData?.narrative || 'N/A'}
-Liability Notes: ${caseData?.liability_notes || 'N/A'}
+Narrative: ${caseData?.accident_description || 'N/A'}
+
+AT-FAULT PARTY / INSURANCE (FROM CASES TABLE):
+Insurer: ${caseData?.at_fault_insurer || 'N/A'}
+Adjuster: ${caseData?.at_fault_adjuster_name || 'N/A'}
+Adjuster Phone: ${caseData?.at_fault_adjuster_phone || 'N/A'}
+Adjuster Email: ${caseData?.at_fault_adjuster_email || 'N/A'}
+Claim Number: ${caseData?.at_fault_claim_number || 'N/A'}
+Policy Limits: ${caseData?.at_fault_policy_limits || 'N/A'}
 
 DEFENDANT / INSURANCE:
 ${primaryDefendant ? `
@@ -250,9 +256,9 @@ export default function DemandLetterTab({ caseId }: Props) {
     const [caseRes, defendantsRes, injuryRes, settlementRes, workersRes] = await Promise.all([
       supabase
         .from('cases')
-        .select('client_name, dob, address_line_1, address_line_2, city, state, zip, accident_date, incident_type, location, client_role, conditions, narrative, liability_notes')
+        .select('client_name, phone, email, accident_date, accident_location, client_role, conditions, accident_description, at_fault_insurer, at_fault_adjuster_name, at_fault_adjuster_phone, at_fault_adjuster_email, at_fault_claim_number, at_fault_policy_limits')
         .eq('id', caseId)
-        .maybeSingle(),
+        .single(),
       supabase.from('defendants').select('*').eq('case_id', caseId),
       supabase.from('injury_status').select('*').eq('case_id', caseId).maybeSingle(),
       supabase.from('settlement_worksheets').select('*').eq('case_id', caseId).maybeSingle(),
