@@ -97,10 +97,13 @@ export default function MessagesWorkspace() {
       .limit(500)
 
     if (error) {
-      console.error("Failed to fetch conversations:", error.message)
+      console.error("[MessagesWorkspace] fetchConversations error:", error.message)
       return
     }
-    setConversations(buildConversations((data ?? []) as unknown as RawSmsRow[]))
+    console.log("[MessagesWorkspace] raw sms_messages rows:", data)
+    const built = buildConversations((data ?? []) as unknown as RawSmsRow[])
+    console.log("[MessagesWorkspace] built conversations:", built)
+    setConversations(built)
   }, [supabase, buildConversations])
 
   const fetchThread = useCallback(async (caseId: string) => {
