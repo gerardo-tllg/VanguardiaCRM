@@ -23,6 +23,10 @@ const SECTION_HEADINGS = [
   'DAMAGES',
   'STOWERS DOCTRINE NOTICE',
   'DEMAND FOR SETTLEMENT',
+  'Stowers Demand',
+  'STOWERS DEMAND',
+  'Demand for Settlement',
+  'DEMAND FOR SETTLEMENT',
 ]
 
 const HEADER_LINES = [

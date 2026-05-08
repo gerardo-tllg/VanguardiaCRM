@@ -51,14 +51,82 @@ function buildPrompt(data: {
   injury: InjuryStatus | null
   settlement: SettlementWorksheet | null
   workers: CaseWorker[]
+  demandType: 'stowers' | 'formal' | 'simple'
 }): string {
-  const { caseData, defendants, injury, settlement, workers } = data
+  const { caseData, defendants, injury, settlement, workers, demandType } = data
 
   const attorney = workers.find(w => w.role === 'attorney_of_record')
   const primaryDefendant = defendants[0] || null
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
-  return `You are a legal demand letter writer for The Lopez Law Group. Generate a formal demand letter that exactly follows the structure, tone, and legal language of the template below. Replace all bracketed placeholders with the case data provided. Do not add sections that are not in the template. Do not remove any sections. Keep all legal language exactly as written.
+  const caseDataSection = `
+---
+
+CASE DATA TO USE:
+
+Today's Date: ${today}
+
+CLIENT:
+Name: ${caseData?.client_name || 'N/A'}
+Phone: ${caseData?.phone || 'N/A'}
+Email: ${caseData?.email || 'N/A'}
+
+INCIDENT:
+Date of Loss: ${caseData?.accident_date || 'N/A'}
+Location: ${caseData?.accident_location || 'N/A'}
+Client Role: ${caseData?.client_role || 'N/A'}
+Conditions: ${caseData?.conditions || 'N/A'}
+Narrative: ${caseData?.accident_description || 'N/A'}
+
+AT-FAULT PARTY / INSURANCE (FROM CASES TABLE):
+Insurer: ${caseData?.at_fault_insurer || 'N/A'}
+Adjuster: ${caseData?.at_fault_adjuster_name || 'N/A'}
+Adjuster Phone: ${caseData?.at_fault_adjuster_phone || 'N/A'}
+Adjuster Email: ${caseData?.at_fault_adjuster_email || 'N/A'}
+Claim Number: ${caseData?.at_fault_claim_number || 'N/A'}
+Policy Limits: ${caseData?.at_fault_policy_limits || 'N/A'}
+
+DEFENDANT / INSURANCE:
+${primaryDefendant ? `Carrier: ${primaryDefendant.insurance_carrier || 'N/A'}
+Adjuster: ${primaryDefendant.adjuster_name || 'N/A'}
+Adjuster Phone: ${primaryDefendant.adjuster_phone || 'N/A'}
+Adjuster Fax: ${primaryDefendant.adjuster_fax || 'N/A'}
+Adjuster Email: ${primaryDefendant.adjuster_email || 'N/A'}
+Claim Number: ${primaryDefendant.claim_number || 'N/A'}
+Policy Limit: ${primaryDefendant.policy_limits ? '$' + primaryDefendant.policy_limits.toLocaleString() : 'N/A'}
+BI Limit: ${primaryDefendant.bi_limits ? '$' + primaryDefendant.bi_limits.toLocaleString() : 'N/A'}
+MedPay: ${primaryDefendant.med_pay_limits ? '$' + primaryDefendant.med_pay_limits.toLocaleString() : 'N/A'}` : 'No defendant on file.'}
+
+INJURIES:
+ER Visit: ${injury?.er_visit ? 'Yes' : 'No'}
+TBI: ${injury?.tbi_diagnosed ? 'Yes' : 'No'}
+MRI Status: ${injury?.mri_status || 'N/A'}
+Injection Status: ${injury?.injections_status || 'N/A'}
+Surgery Status: ${injury?.surgery_status || 'N/A'}
+MMI Reached: ${injury?.mmi_reached ? 'Yes' : 'No'}
+Notes: ${injury?.additional_notes || 'N/A'}
+
+SETTLEMENT:
+Gross Settlement Target: ${settlement?.gross_settlement ? '$' + settlement.gross_settlement.toLocaleString() : 'N/A'}
+Attorney Fee: ${settlement?.attorney_fee_percentage ? settlement.attorney_fee_percentage + '%' : 'N/A'}
+Net to Client: ${settlement?.net_to_client ? '$' + settlement.net_to_client.toLocaleString() : 'N/A'}
+
+ATTORNEY OF RECORD:
+${attorney ? `${attorney.user_name || 'N/A'}` : 'Not assigned'}`
+
+  const sharedInstructions = `
+INSTRUCTIONS:
+- Follow the template structure exactly - same sections, same order, same legal language
+- Replace placeholders with case data above
+- For the adjuster salutation use "Dear Mr./Ms. [Last Name]," - infer gender from name if possible, otherwise use full name
+- For the demand amount: if gross settlement target is set use that dollar figure, otherwise demand policy limits
+- For injuries/diagnoses/treatment: use the injury status data to write realistic, specific clinical language consistent with a PI demand letter
+- For the Medical Expenses section: if provider and billing information is included in the injury notes, extract and list each provider with their billed amount. If no itemized data is available, state the total amount only.
+- Do not invent facts not supported by the case data
+- Output only the letter - no preamble, no commentary`
+
+  if (demandType === 'stowers') {
+    return `You are a legal demand letter writer for The Lopez Law Group. Generate a formal demand letter that exactly follows the structure, tone, and legal language of the template below. Replace all bracketed placeholders with the case data provided. Do not add sections that are not in the template. Do not remove any sections. Keep all legal language exactly as written.
 
 ---
 TEMPLATE STRUCTURE TO FOLLOW:
@@ -133,72 +201,142 @@ The Lopez Law Group
 
 [ATTORNEY NAME]
 Attorney at Law
+${caseDataSection}
+${sharedInstructions}`
+  }
+
+  const formalTemplate = `You are a legal demand letter writer for The Lopez Law Group. Generate a formal demand letter that exactly follows the structure, tone, and legal language of the template below. Replace all bracketed placeholders with the case data provided. Do not add sections that are not in the template. Do not remove any sections. Keep all legal language exactly as written.
 
 ---
+TEMPLATE STRUCTURE TO FOLLOW:
 
-CASE DATA TO USE:
+[TODAY'S DATE]
 
-Today's Date: ${today}
+Via Fax: [ADJUSTER FAX]
 
-CLIENT:
-Name: ${caseData?.client_name || 'N/A'}
-Phone: ${caseData?.phone || 'N/A'}
-Email: ${caseData?.email || 'N/A'}
+[INSURANCE CARRIER NAME]
+Attn: [ADJUSTER NAME]
 
-INCIDENT:
-Date of Loss: ${caseData?.accident_date || 'N/A'}
-Location: ${caseData?.accident_location || 'N/A'}
-Client Role: ${caseData?.client_role || 'N/A'}
-Conditions: ${caseData?.conditions || 'N/A'}
-Narrative: ${caseData?.accident_description || 'N/A'}
+Re: [INCIDENT TYPE] - Personal Injury Claim
+Claim Number: [CLAIM NUMBER]
+Date of Incident: [DATE OF LOSS]
 
-AT-FAULT PARTY / INSURANCE (FROM CASES TABLE):
-Insurer: ${caseData?.at_fault_insurer || 'N/A'}
-Adjuster: ${caseData?.at_fault_adjuster_name || 'N/A'}
-Adjuster Phone: ${caseData?.at_fault_adjuster_phone || 'N/A'}
-Adjuster Email: ${caseData?.at_fault_adjuster_email || 'N/A'}
-Claim Number: ${caseData?.at_fault_claim_number || 'N/A'}
-Policy Limits: ${caseData?.at_fault_policy_limits || 'N/A'}
+Client: [CLIENT NAME]
+Insured: [DEFENDANT / INSURED NAME]
 
-DEFENDANT / INSURANCE:
-${primaryDefendant ? `
-Carrier: ${primaryDefendant.insurance_carrier || 'N/A'}
-Adjuster: ${primaryDefendant.adjuster_name || 'N/A'}
-Adjuster Phone: ${primaryDefendant.adjuster_phone || 'N/A'}
-Adjuster Fax: ${primaryDefendant.adjuster_fax || 'N/A'}
-Adjuster Email: ${primaryDefendant.adjuster_email || 'N/A'}
-Claim Number: ${primaryDefendant.claim_number || 'N/A'}
-Policy Limit: ${primaryDefendant.policy_limits ? '$' + primaryDefendant.policy_limits.toLocaleString() : 'N/A'}
-BI Limit: ${primaryDefendant.bi_limits ? '$' + primaryDefendant.bi_limits.toLocaleString() : 'N/A'}
-MedPay: ${primaryDefendant.med_pay_limits ? '$' + primaryDefendant.med_pay_limits.toLocaleString() : 'N/A'}
-` : 'No defendant on file.'}
+Dear [ADJUSTER SALUTATION],
 
-INJURIES:
-ER Visit: ${injury?.er_visit ? 'Yes' : 'No'}
-TBI: ${injury?.tbi_diagnosed ? 'Yes' : 'No'}
-MRI Status: ${injury?.mri_status || 'N/A'}
-Injection Status: ${injury?.injections_status || 'N/A'}
-Surgery Status: ${injury?.surgery_status || 'N/A'}
-MMI Reached: ${injury?.mmi_reached ? 'Yes' : 'No'}
-Notes: ${injury?.additional_notes || 'N/A'}
+Our office represents [CLIENT NAME] for injuries sustained in a motor vehicle collision on [DATE OF LOSS]. This correspondence serves as a formal demand for settlement.
 
-SETTLEMENT:
-Gross Settlement Target: ${settlement?.gross_settlement ? '$' + settlement.gross_settlement.toLocaleString() : 'N/A'}
-Attorney Fee: ${settlement?.attorney_fee_percentage ? settlement.attorney_fee_percentage + '%' : 'N/A'}
-Net to Client: ${settlement?.net_to_client ? '$' + settlement.net_to_client.toLocaleString() : 'N/A'}
+LIABILITY
 
-ATTORNEY OF RECORD:
-${attorney ? `${attorney.user_name || 'N/A'}` : 'Not assigned'}
+[Write 1-2 assertive paragraphs establishing clear liability on the part of your insured. Reference the accident description, road conditions, and how the defendant's negligence directly caused the collision.]
 
-INSTRUCTIONS:
-- Follow the template structure exactly - same sections, same order, same legal language
-- Replace placeholders with case data above
-- For the adjuster salutation use "Dear Mr./Ms. [Last Name]," - infer gender from name if possible, otherwise use full name
-- For the demand amount: if gross settlement target is set use that dollar figure, otherwise demand policy limits
-- For injuries/diagnoses/treatment: use the injury status data to write realistic, specific clinical language consistent with a PI demand letter
-- For the Medical Expenses section: if provider and billing information is included in the injury notes, extract and list each provider with their billed amount. If no itemized data is available, state the total amount only.
-- Do not invent facts not supported by the case data
-- Output only the letter - no preamble, no commentary`
+INJURIES AND MEDICAL TREATMENT
+
+[CLIENT NAME] presented for medical evaluation following the incident. Objective findings included:
+
+[LIST KEY SYMPTOMS AND COMPLAINTS as bullet points - cervical pain, lumbar pain, headaches, radiculopathy, etc.]
+
+[CLIENT NAME] continues to experience the following ongoing symptoms:
+
+[LIST ONGOING SYMPTOMS as bullet points - base on treatment notes, MMI status, surgery/injection status]
+
+MEDICAL EXPENSES
+
+[CLIENT NAME] has incurred the following reasonable, necessary, and causally related medical expenses:
+
+[LIST EACH PROVIDER WITH AMOUNT - Format each as: "- Provider Name - $Amount". End with "Total Medical Expenses: $[TOTAL]"]
+
+All charges are customary, reasonable, and medically necessary.
+
+DAMAGES
+
+[CLIENT NAME] has suffered significant pain and suffering, mental anguish, and loss of enjoyment of life as a direct result of the negligence of your insured. [Write 1-2 paragraphs highlighting the most serious injuries and their impact on the client's daily life, work, and relationships.]
+
+DEMAND FOR SETTLEMENT
+
+We hereby demand $[GROSS_SETTLEMENT_OR_POLICY_LIMITS - use gross settlement target if available, otherwise "the applicable policy limits"] or the applicable policy limits, whichever is less, in full and final settlement of all claims arising out of this incident, in exchange for a full and unconditional release of all potential claims, including all liens.
+
+Stowers Demand
+
+Please be advised that this constitutes a Stowers demand. You are hereby required to respond within 15 days of receipt of this letter. Failure to accept this demand within policy limits may expose your insured to an excess judgment, for which you may be held liable under the Stowers doctrine.
+
+Respectfully,
+
+The Lopez Law Group
+
+[ATTORNEY NAME]
+Attorney at Law
+${caseDataSection}
+${sharedInstructions}`
+
+  if (demandType === 'formal') return formalTemplate
+
+  // 'simple' - same as formal without the Stowers Demand section, 30-day deadline
+  return `You are a legal demand letter writer for The Lopez Law Group. Generate a formal demand letter that exactly follows the structure, tone, and legal language of the template below. Replace all bracketed placeholders with the case data provided. Do not add sections that are not in the template. Do not remove any sections. Keep all legal language exactly as written.
+
+---
+TEMPLATE STRUCTURE TO FOLLOW:
+
+[TODAY'S DATE]
+
+Via Fax: [ADJUSTER FAX]
+
+[INSURANCE CARRIER NAME]
+Attn: [ADJUSTER NAME]
+
+Re: [INCIDENT TYPE] - Personal Injury Claim
+Claim Number: [CLAIM NUMBER]
+Date of Incident: [DATE OF LOSS]
+
+Client: [CLIENT NAME]
+Insured: [DEFENDANT / INSURED NAME]
+
+Dear [ADJUSTER SALUTATION],
+
+Our office represents [CLIENT NAME] for injuries sustained in a motor vehicle collision on [DATE OF LOSS]. This correspondence serves as a formal demand for settlement.
+
+LIABILITY
+
+[Write 1-2 assertive paragraphs establishing clear liability on the part of your insured. Reference the accident description, road conditions, and how the defendant's negligence directly caused the collision.]
+
+INJURIES AND MEDICAL TREATMENT
+
+[CLIENT NAME] presented for medical evaluation following the incident. Objective findings included:
+
+[LIST KEY SYMPTOMS AND COMPLAINTS as bullet points - cervical pain, lumbar pain, headaches, radiculopathy, etc.]
+
+[CLIENT NAME] continues to experience the following ongoing symptoms:
+
+[LIST ONGOING SYMPTOMS as bullet points - base on treatment notes, MMI status, surgery/injection status]
+
+MEDICAL EXPENSES
+
+[CLIENT NAME] has incurred the following reasonable, necessary, and causally related medical expenses:
+
+[LIST EACH PROVIDER WITH AMOUNT - Format each as: "- Provider Name - $Amount". End with "Total Medical Expenses: $[TOTAL]"]
+
+All charges are customary, reasonable, and medically necessary.
+
+DAMAGES
+
+[CLIENT NAME] has suffered significant pain and suffering, mental anguish, and loss of enjoyment of life as a direct result of the negligence of your insured. [Write 1-2 paragraphs highlighting the most serious injuries and their impact on the client's daily life, work, and relationships.]
+
+DEMAND FOR SETTLEMENT
+
+We hereby demand $[GROSS_SETTLEMENT_OR_POLICY_LIMITS - use gross settlement target if available, otherwise "the applicable policy limits"] or the applicable policy limits, whichever is less, in full and final settlement of all claims arising out of this incident, in exchange for a full and unconditional release of all potential claims, including all liens.
+
+We kindly request that you respond to this letter within 30 days from the date of receipt. We hope to achieve a prompt and fair resolution to this matter and avoid the necessity of legal action.
+
+Respectfully,
+
+The Lopez Law Group
+
+[ATTORNEY NAME]
+Attorney at Law
+${caseDataSection}
+${sharedInstructions}`
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -225,6 +363,7 @@ export default function DemandLetterTab({ caseId }: Props) {
 
   const supabase = useMemo(() => createClient(), [])
 
+  const [demandType, setDemandType] = useState<'stowers' | 'formal' | 'simple'>('stowers')
   const [letter, setLetter] = useState<DemandLetter | null>(null)
   const [editContent, setEditContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
@@ -284,6 +423,7 @@ export default function DemandLetterTab({ caseId }: Props) {
       injury: injuryRes.data,
       settlement: settlementRes.data,
       workers: workersRes.data ?? [],
+      demandType,
     })
 
     let generatedContent: string
@@ -452,6 +592,21 @@ export default function DemandLetterTab({ caseId }: Props) {
       <div>
         <h2 className="text-lg font-semibold text-[#2b2b2b]">Demand Letter</h2>
         <p className="text-sm text-[#6b6b6b]">Changes are not auto-saved.</p>
+      </div>
+
+      {/* ── Demand type selector ─────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-[#6b6b6b]">Demand Type</label>
+        <select
+          value={demandType}
+          onChange={(e) => setDemandType(e.target.value as 'stowers' | 'formal' | 'simple')}
+          disabled={generating || saving}
+          className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="stowers">Stowers Demand (Policy Limits)</option>
+          <option value="formal">Formal Demand (Specific Amount)</option>
+          <option value="simple">Simple Demand</option>
+        </select>
       </div>
 
       {/* ── Generate button ───────────────────────────────────────────────────── */}
