@@ -43,12 +43,6 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" })
 }
 
-type CaseOption = {
-  id: string
-  client_name: string | null
-  case_number: string | null
-}
-
 export default function MessagesWorkspace() {
   const supabase = useMemo(() => createClient(), [])
 
@@ -64,10 +58,7 @@ export default function MessagesWorkspace() {
 
   // New message modal
   const [showNewMsg, setShowNewMsg] = useState(false)
-  const [caseOptions, setCaseOptions] = useState<CaseOption[]>([])
-  const [casesLoading, setCasesLoading] = useState(false)
   const [newPhone, setNewPhone] = useState("")
-  const [newCaseId, setNewCaseId] = useState("")
   const [newMessage, setNewMessage] = useState("")
   const [newSending, setNewSending] = useState(false)
   const [newError, setNewError] = useState<string | null>(null)
@@ -137,27 +128,11 @@ export default function MessagesWorkspace() {
     )
   }, [supabase])
 
-  const fetchCases = useCallback(async () => {
-    setCasesLoading(true)
-    const { data, error } = await supabase
-      .from("cases")
-      .select("id, client_name, case_number")
-      .order("client_name", { ascending: true })
-    setCasesLoading(false)
-    if (error) {
-      console.error("Failed to fetch cases:", error.message)
-      return
-    }
-    setCaseOptions((data ?? []) as CaseOption[])
-  }, [supabase])
-
   function openNewMsg() {
     setShowNewMsg(true)
     setNewPhone("")
-    setNewCaseId("")
     setNewMessage("")
     setNewError(null)
-    if (caseOptions.length === 0) fetchCases()
   }
 
   function closeNewMsg() {
@@ -177,7 +152,6 @@ export default function MessagesWorkspace() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          case_id: newCaseId || null,
           to: newPhone.trim(),
           message: newMessage.trim(),
         }),
@@ -191,7 +165,6 @@ export default function MessagesWorkspace() {
       }
 
       await fetchConversations()
-      if (newCaseId) setSelectedCaseId(newCaseId)
       closeNewMsg()
     } finally {
       setNewSending(false)
@@ -329,31 +302,6 @@ export default function MessagesWorkspace() {
                 placeholder="+19561234567"
                 className="w-full rounded-md border border-[#d9d9d9] px-4 py-2.5 text-sm text-[#2b2b2b] placeholder:text-[#8a8a8a] outline-none focus:border-[#4b0a06]"
               />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-[#555555]">
-                Case <span className="text-[#8a8a8a] font-normal">(optional)</span>
-              </label>
-              <select
-                value={newCaseId}
-                onChange={(e) => {
-                  setNewCaseId(e.target.value)
-                  const chosen = caseOptions.find((c) => c.id === e.target.value)
-                  if (chosen && !newPhone) {
-                    // phone is on the case but not in this select — left for user to fill
-                  }
-                }}
-                disabled={casesLoading}
-                className="w-full rounded-md border border-[#d9d9d9] px-4 py-2.5 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06] bg-white disabled:opacity-50"
-              >
-                <option value="">-- Select a case --</option>
-                {caseOptions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.client_name ?? "Unknown"}{c.case_number ? ` - ${c.case_number}` : ""}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div>

@@ -22,14 +22,14 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const { case_id, to, message } = body as {
-      case_id: string
+      case_id?: string | null
       to: string
       message: string
     }
 
-    if (!case_id || !to || !message?.trim()) {
+    if (!to || !message?.trim()) {
       return NextResponse.json(
-        { success: false, error: 'case_id, to, and message are required' },
+        { success: false, error: 'to and message are required' },
         { status: 400 }
       )
     }
@@ -43,9 +43,9 @@ export async function POST(req: Request) {
     )
 
     const { error: dbError } = await supabaseAdmin.from('sms_messages').insert({
-      case_id,
+      case_id: case_id ?? null,
       direction: 'outbound',
-      from_number: from,
+      from_number: from ?? null,
       to_number: to,
       body: message.trim(),
       status: 'sent',
