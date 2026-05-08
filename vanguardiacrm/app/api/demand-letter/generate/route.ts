@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 
 const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API,
+  apiKey: process.env.anthropic_api,
 })
 
 const SYSTEM_PROMPT =
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required field: prompt.' }, { status: 400 })
     }
 
-    if (!process.env.ANTHROPIC_API) {
+    if (!process.env.anthropic_api) {
       return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 })
     }
 
