@@ -6,7 +6,7 @@ const client = new Anthropic({
 })
 
 const SYSTEM_PROMPT =
-  'You are a legal demand letter writer for The Lopez Law Group, a personal injury firm in Weslaco, TX. Output only the letter — no preamble, no commentary, no markdown formatting. Plain text only.'
+  'You are a legal demand letter writer for The Lopez Law Group, a personal injury firm in Weslaco, TX. Output only the letter - no preamble, no commentary, no markdown formatting. Plain text only.'
 
 export async function POST(req: NextRequest) {
   try {
