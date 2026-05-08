@@ -1,4 +1,4 @@
-﻿// v2 - force rebuild
+// v2 - force rebuild
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 
