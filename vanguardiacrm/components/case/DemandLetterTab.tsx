@@ -107,6 +107,14 @@ Treatment Plan
 
 [LIST TREATMENTS - base on injection status, surgery status, MRI, ER visit, treatment notes. Include frequency and recommended future treatment if applicable.]
 
+Medical Expenses
+
+[CLIENT NAME] has incurred the following reasonable, necessary, and causally related medical expenses:
+
+[LIST EACH PROVIDER WITH AMOUNT - extract from the injury notes field which contains provider details, or list any provider data available. Format each as: "- Provider Name - $Amount". End with a total line: "Total Medical Expenses: $[TOTAL]"]
+
+All charges are customary, reasonable, and medically necessary.
+
 Stower's Doctrine and Demand of Settlement
 
 Under your policy, you have a duty to (1) defend the insured against any claim within the scope of coverage and (2) indemnify the insured for any damages awarded against your insured. These two duties give rise to the Stower's doctrine or your duty to accept reasonable settlement offers within policy limits. Through this duty, you may be liable for negligently refusing to settle this claim within policy limits.
@@ -188,6 +196,7 @@ INSTRUCTIONS:
 - For the adjuster salutation use "Dear Mr./Ms. [Last Name]," - infer gender from name if possible, otherwise use full name
 - For the demand amount: if gross settlement target is set use that dollar figure, otherwise demand policy limits
 - For injuries/diagnoses/treatment: use the injury status data to write realistic, specific clinical language consistent with a PI demand letter
+- For the Medical Expenses section: if provider and billing information is included in the injury notes, extract and list each provider with their billed amount. If no itemized data is available, state the total amount only.
 - Do not invent facts not supported by the case data
 - Output only the letter - no preamble, no commentary`
 }
