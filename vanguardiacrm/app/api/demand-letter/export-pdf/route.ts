@@ -11,9 +11,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing content.' }, { status: 400 })
     }
 
-    const buffer = await renderToBuffer(
-      React.createElement(DemandLetterPDF, { content, letterheadUrl, footerUrl })
-    )
+    const element = React.createElement(DemandLetterPDF, { content, letterheadUrl, footerUrl })
+    const buffer = await renderToBuffer(element as React.ReactElement<any>)
 
     return new NextResponse(buffer, {
       status: 200,
