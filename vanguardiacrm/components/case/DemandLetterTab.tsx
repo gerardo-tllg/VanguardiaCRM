@@ -249,6 +249,7 @@ export default function DemandLetterTab({ caseId }: Props) {
   const canEdit = !generating && !saving && !isEditing
 
   async function handleGenerate() {
+    console.log('[DemandLetterTab] generateLetter called')
     setGenerating(true)
     setGenerateError(null)
     setIsEditing(false)
@@ -275,12 +276,14 @@ export default function DemandLetterTab({ caseId }: Props) {
 
     let generatedContent: string
     try {
+      console.log('[DemandLetterTab] Fetching:', '/api/demand-letter/generate')
       const res = await fetch('/api/demand-letter/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       })
 
+      console.log('[DemandLetterTab] Response status:', res.status, res.ok)
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         setGenerateError(body.error ?? 'Generation failed. Please try again.')
