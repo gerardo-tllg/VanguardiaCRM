@@ -223,6 +223,7 @@ export default function DemandLetterTab({ caseId }: Props) {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -390,6 +391,37 @@ export default function DemandLetterTab({ caseId }: Props) {
     }
   }
 
+  async function exportPDF() {
+    setIsExporting(true)
+    try {
+      const res = await fetch('/api/demand-letter/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: savedContent,
+          letterheadUrl: 'https://xgsegmcapbrteiaiizah.supabase.co/storage/v1/object/public/assets/letterhead.png',
+          footerUrl: 'https://xgsegmcapbrteiaiizah.supabase.co/storage/v1/object/public/assets/footer.png',
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error ?? 'PDF export failed. Please try again.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `demand-letter-${caseId}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('PDF export failed. Please try again.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   function handleStartEdit() {
     setSaveError(null)
     setEditContent(savedContent)
@@ -507,11 +539,11 @@ export default function DemandLetterTab({ caseId }: Props) {
                 <>
                   <button
                     type="button"
-                    onClick={handleExport}
-                    disabled={exporting || generating || saving}
+                    onClick={exportPDF}
+                    disabled={isExporting || generating || saving}
                     className="rounded-md border border-[#d9d9d9] bg-white px-3 py-1 text-xs font-medium text-[#555555] hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {exporting ? 'Exporting...' : 'Export to Word'}
+                    {isExporting ? 'Exporting...' : 'Export PDF'}
                   </button>
                   <button
                     type="button"
