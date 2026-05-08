@@ -284,6 +284,7 @@ export default function DemandLetterTab({ caseId }: Props) {
       })
 
       console.log('[DemandLetterTab] Response status:', res.status, res.ok)
+      console.log('[DemandLetterTab] Response ok, reading stream')
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         setGenerateError(body.error ?? 'Generation failed. Please try again.')
@@ -313,8 +314,10 @@ export default function DemandLetterTab({ caseId }: Props) {
         return
       }
 
+      console.log('[DemandLetterTab] Full text length:', accumulated.length, 'preview:', accumulated.slice(0, 100))
       generatedContent = accumulated
-    } catch {
+    } catch (err) {
+      console.error('[DemandLetterTab] Caught error:', err)
       setGenerateError('Network error. Please try again.')
       setGenerating(false)
       return
@@ -334,6 +337,7 @@ export default function DemandLetterTab({ caseId }: Props) {
       ...(letter?.id ? { id: letter.id } : {}),
     }
 
+    console.log('[DemandLetterTab] Saving to Supabase')
     const { data, error } = await supabase
       .from('demand_letters')
       .upsert(payload, { onConflict: 'case_id' })
