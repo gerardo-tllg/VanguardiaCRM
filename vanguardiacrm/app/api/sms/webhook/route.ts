@@ -1,3 +1,7 @@
+// Twilio webhook URL to register in Twilio Console → Messaging Service → Integrations:
+// https://vanguardia-crm.vercel.app/api/sms/webhook?x-vercel-protection-bypass=c5BhQKppLHO7Xh42G7fcRwekwlneqYtk
+// Method: HTTP POST   Status callback: (leave blank or use the same URL)
+
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 

@@ -1,7 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_ROUTES = ["/login", "/auth/callback", "/api/auth", "/api/external/leads"];
+const PUBLIC_ROUTES = [
+  "/login",
+  "/auth/callback",
+  "/api/auth",
+  "/api/external/leads",
+  "/api/sms/webhook",
+  "/api/sms/status",
+];
 
 function isPublicRoute(pathname: string) {
   return (
@@ -14,7 +21,7 @@ function isPublicRoute(pathname: string) {
   );
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   let response = NextResponse.next({
@@ -50,7 +57,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ❌ Not logged in → block access
   if (!user && !isPublicRoute(pathname)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
