@@ -32,6 +32,18 @@ type RawSmsRow = {
   cases: { client_name: string | null; phone: string | null } | null
 }
 
+function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length === 11 && digits.startsWith('1')) {
+    const d = digits.slice(1)
+    return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`
+  }
+  return phone
+}
+
 function formatTime(iso: string): string {
   const d = new Date(iso)
   const now = new Date()
@@ -75,7 +87,7 @@ export default function MessagesWorkspace() {
   const selectedConv = conversations.find((c) => c.externalPhone === selectedPhone) ?? null
 
   function getDisplayName(phone: string, clientName: string | null): string {
-    return localNames[phone] ?? clientName ?? phone
+    return localNames[phone] ?? clientName ?? formatPhone(phone)
   }
 
   // Group raw rows by external phone (client's number)
@@ -409,7 +421,7 @@ export default function MessagesWorkspace() {
                       <div className="min-w-0">
                         <div className="font-medium text-[#2b2b2b] truncate">{name}</div>
                         {conv.clientName || localNames[conv.externalPhone] ? (
-                          <div className="mt-1 text-xs text-[#6b6b6b]">{conv.externalPhone}</div>
+                          <div className="mt-1 text-xs text-[#6b6b6b]">{formatPhone(conv.externalPhone)}</div>
                         ) : null}
                       </div>
                       <div className="text-right shrink-0">
@@ -489,7 +501,7 @@ export default function MessagesWorkspace() {
                         ? getDisplayName(selectedConv.externalPhone, selectedConv.clientName)
                         : selectedPhone}
                     </h2>
-                    <p className="mt-1 text-sm text-[#6b6b6b]">{selectedPhone}</p>
+                    <p className="mt-1 text-sm text-[#6b6b6b]">{formatPhone(selectedPhone)}</p>
                   </div>
                   <div className="rounded-full border border-[#e4c9c4] bg-[#fdf6f5] px-4 py-2 text-sm text-[#4b0a06]">
                     Live via Twilio
