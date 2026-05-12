@@ -21,10 +21,11 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { case_id, to, message } = body as {
+    const { case_id, to, message, channel = 'sms' } = body as {
       case_id?: string | null
       to: string
       message: string
+      channel?: string
     }
 
     if (!to || !message?.trim()) {
@@ -36,10 +37,15 @@ export async function POST(req: Request) {
 
     const client = twilio(sid, token)
 
+    const twilioTo = channel === 'whatsapp' ? `whatsapp:${to}` : to
+    const twilioFrom = channel === 'whatsapp' ? `whatsapp:${from}` : from
+
     const sent = await client.messages.create(
-      messagingServiceSid
-        ? { body: message.trim(), messagingServiceSid, to }
-        : { body: message.trim(), from, to }
+      channel === 'whatsapp'
+        ? { body: message.trim(), from: twilioFrom!, to: twilioTo }
+        : messagingServiceSid
+          ? { body: message.trim(), messagingServiceSid, to: twilioTo }
+          : { body: message.trim(), from: twilioFrom!, to: twilioTo }
     )
 
     const { error: dbError } = await supabaseAdmin.from('sms_messages').insert({
@@ -51,6 +57,8 @@ export async function POST(req: Request) {
       status: 'sent',
       twilio_sid: sent.sid,
       sent_at: new Date().toISOString(),
+      channel,
+      via_number: from ?? null,
     })
 
     if (dbError) {

@@ -3,6 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 
+const CHANNEL_LABELS: Record<string, string> = {
+  '+19564057494': 'Intake',
+  '+19566921122': 'Out-of-State Spanish',
+  '+19566921542': 'Tracking - SEO',
+  '+19566921619': 'Tracking - GBP',
+  '+19565946836': 'Tracking - Google Ads',
+  '+19564057877': 'Tracking - Social',
+  '+19565946760': 'Tracking - Referral',
+}
+
 type ConvRow = {
   externalPhone: string
   caseId: string | null
@@ -10,6 +20,8 @@ type ConvRow = {
   lastBody: string
   lastDirection: "inbound" | "outbound"
   lastAt: string
+  channel: string
+  viaNumber: string | null
 }
 
 type MsgRow = {
@@ -18,6 +30,8 @@ type MsgRow = {
   body: string
   status: string
   createdAt: string
+  channel: string
+  viaNumber: string | null
 }
 
 type RawSmsRow = {
@@ -29,6 +43,8 @@ type RawSmsRow = {
   from_number: string | null
   to_number: string | null
   created_at: string
+  channel: string
+  via_number: string | null
   cases: { client_name: string | null; phone: string | null } | null
 }
 
@@ -54,6 +70,21 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" })
 }
 
+function ChannelBadge({ channel }: { channel: string }) {
+  if (channel === 'whatsapp') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+        <span>W</span> WhatsApp
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
+      SMS
+    </span>
+  )
+}
+
 export default function MessagesWorkspace() {
   const supabase = useMemo(() => createClient(), [])
 
@@ -67,15 +98,14 @@ export default function MessagesWorkspace() {
   const [threadLoading, setThreadLoading] = useState(false)
   const [unread, setUnread] = useState<Record<string, number>>({})
 
-  // Local contact name overrides (in-memory; Supabase persistence to be added later)
   const [localNames, setLocalNames] = useState<Record<string, string>>({})
   const [editingPhone, setEditingPhone] = useState<string | null>(null)
   const [nameInput, setNameInput] = useState("")
 
-  // New message modal
   const [showNewMsg, setShowNewMsg] = useState(false)
   const [newPhone, setNewPhone] = useState("")
   const [newMessage, setNewMessage] = useState("")
+  const [newChannel, setNewChannel] = useState<'sms' | 'whatsapp'>('sms')
   const [newSending, setNewSending] = useState(false)
   const [newError, setNewError] = useState<string | null>(null)
 
@@ -90,7 +120,6 @@ export default function MessagesWorkspace() {
     return localNames[phone] ?? clientName ?? formatPhone(phone)
   }
 
-  // Group raw rows by external phone (client's number)
   const buildConversations = useCallback((rows: RawSmsRow[]): ConvRow[] => {
     const map = new Map<string, ConvRow>()
     for (const r of rows) {
@@ -104,6 +133,8 @@ export default function MessagesWorkspace() {
           lastBody: r.body,
           lastDirection: r.direction,
           lastAt: r.created_at,
+          channel: r.channel ?? 'sms',
+          viaNumber: r.via_number ?? null,
         })
       }
     }
@@ -113,7 +144,7 @@ export default function MessagesWorkspace() {
   const fetchConversations = useCallback(async () => {
     const { data, error } = await supabase
       .from("sms_messages")
-      .select("id, case_id, direction, body, status, from_number, to_number, created_at, cases(client_name, phone)")
+      .select("id, case_id, direction, body, status, from_number, to_number, created_at, channel, via_number, cases(client_name, phone)")
       .order("created_at", { ascending: false })
       .limit(500)
 
@@ -121,18 +152,15 @@ export default function MessagesWorkspace() {
       console.error("[MessagesWorkspace] fetchConversations error:", error.message)
       return
     }
-    console.log("[MessagesWorkspace] raw rows:", data)
     const built = buildConversations((data ?? []) as unknown as RawSmsRow[])
-    console.log("[MessagesWorkspace] built conversations:", built)
     setConversations(built)
   }, [supabase, buildConversations])
 
-  // Fetch thread by external phone — pulls all messages to or from that number
   const fetchThread = useCallback(async (phone: string) => {
     setThreadLoading(true)
     const { data, error } = await supabase
       .from("sms_messages")
-      .select("id, direction, body, status, created_at")
+      .select("id, direction, body, status, created_at, channel, via_number")
       .or(`from_number.eq.${phone},to_number.eq.${phone}`)
       .order("created_at", { ascending: true })
     setThreadLoading(false)
@@ -148,30 +176,28 @@ export default function MessagesWorkspace() {
         body: r.body,
         status: r.status,
         createdAt: r.created_at,
+        channel: r.channel ?? 'sms',
+        viaNumber: r.via_number ?? null,
       }))
     )
   }, [supabase])
 
-  // Initial load
   useEffect(() => {
     fetchConversations().finally(() => setLoading(false))
   }, [fetchConversations])
 
-  // Load thread when a conversation is selected
   useEffect(() => {
     if (!selectedPhone) return
     fetchThread(selectedPhone)
     setUnread((prev) => ({ ...prev, [selectedPhone]: 0 }))
   }, [selectedPhone, fetchThread])
 
-  // Auto-scroll thread
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Realtime — keyed on external phone via ref to avoid re-subscribing
   useEffect(() => {
-    const channel = supabase
+    const realtimeChannel = supabase
       .channel("sms_messages_live")
       .on(
         "postgres_changes",
@@ -191,6 +217,8 @@ export default function MessagesWorkspace() {
                 body: row.body,
                 status: row.status,
                 createdAt: row.created_at ?? new Date().toISOString(),
+                channel: row.channel ?? 'sms',
+                viaNumber: row.via_number ?? null,
               },
             ])
           } else if (externalPhone && row.direction === "inbound") {
@@ -205,10 +233,9 @@ export default function MessagesWorkspace() {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { supabase.removeChannel(realtimeChannel) }
   }, [supabase, fetchConversations])
 
-  // Send in active thread — to is always the selectedPhone
   async function handleSend() {
     if (!selectedPhone || !draft.trim()) return
     setSending(true)
@@ -222,6 +249,7 @@ export default function MessagesWorkspace() {
           case_id: selectedConv?.caseId ?? null,
           to: selectedPhone,
           message: draft.trim(),
+          channel: selectedConv?.channel ?? 'sms',
         }),
       })
 
@@ -240,6 +268,8 @@ export default function MessagesWorkspace() {
           body: draft.trim(),
           status: "sent",
           createdAt: new Date().toISOString(),
+          channel: selectedConv?.channel ?? 'sms',
+          viaNumber: selectedConv?.viaNumber ?? null,
         },
       ])
       setDraft("")
@@ -256,11 +286,11 @@ export default function MessagesWorkspace() {
     }
   }
 
-  // New message modal
   function openNewMsg() {
     setShowNewMsg(true)
     setNewPhone("")
     setNewMessage("")
+    setNewChannel('sms')
     setNewError(null)
   }
 
@@ -283,6 +313,7 @@ export default function MessagesWorkspace() {
         body: JSON.stringify({
           to: newPhone.trim(),
           message: newMessage.trim(),
+          channel: newChannel,
         }),
       })
 
@@ -301,7 +332,6 @@ export default function MessagesWorkspace() {
     }
   }
 
-  // Add Contact inline form
   function startEditName(phone: string, current: string | null) {
     setEditingPhone(phone)
     setNameInput(localNames[phone] ?? current ?? "")
@@ -334,6 +364,20 @@ export default function MessagesWorkspace() {
 
             <div className="px-6 py-5 space-y-4">
               {newError && <p className="text-xs text-red-600">{newError}</p>}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[#555555]">
+                  Channel
+                </label>
+                <select
+                  value={newChannel}
+                  onChange={(e) => setNewChannel(e.target.value as 'sms' | 'whatsapp')}
+                  className="w-full rounded-md border border-[#d9d9d9] bg-white px-4 py-2.5 text-sm text-[#2b2b2b] outline-none focus:border-[#4b0a06]"
+                >
+                  <option value="sms">SMS</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+              </div>
 
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-[#555555]">
@@ -407,6 +451,7 @@ export default function MessagesWorkspace() {
               const unreadCount = unread[conv.externalPhone] ?? 0
               const name = getDisplayName(conv.externalPhone, conv.clientName)
               const isEditing = editingPhone === conv.externalPhone
+              const viaLabel = conv.viaNumber ? (CHANNEL_LABELS[conv.viaNumber] ?? conv.viaNumber) : null
 
               return (
                 <div key={conv.externalPhone} className="border-b border-[#eeeeee]">
@@ -423,6 +468,12 @@ export default function MessagesWorkspace() {
                         {conv.clientName || localNames[conv.externalPhone] ? (
                           <div className="mt-1 text-xs text-[#6b6b6b]">{formatPhone(conv.externalPhone)}</div>
                         ) : null}
+                        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                          <ChannelBadge channel={conv.channel} />
+                          {viaLabel && (
+                            <span className="text-[10px] text-[#8a8a8a]">via {viaLabel}</span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-xs text-[#8a8a8a]">{formatTime(conv.lastAt)}</div>
@@ -518,6 +569,7 @@ export default function MessagesWorkspace() {
                 )}
                 {messages.map((msg) => {
                   const outbound = msg.direction === "outbound"
+                  const viaLabel = msg.viaNumber ? (CHANNEL_LABELS[msg.viaNumber] ?? msg.viaNumber) : null
                   return (
                     <div
                       key={msg.id}
@@ -534,11 +586,19 @@ export default function MessagesWorkspace() {
                         <div className="text-sm leading-6">{msg.body}</div>
                         <div
                           className={[
-                            "mt-2 text-xs",
-                            outbound ? "text-white/80" : "text-[#8a8a8a]",
+                            "mt-2 flex items-center gap-2 text-xs",
+                            outbound ? "text-white/70" : "text-[#8a8a8a]",
                           ].join(" ")}
                         >
-                          {formatTime(msg.createdAt)}
+                          <span>{formatTime(msg.createdAt)}</span>
+                          {msg.channel === 'whatsapp' ? (
+                            <span className="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">W</span>
+                          ) : (
+                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${outbound ? 'bg-white/20 text-white/80' : 'bg-gray-100 text-gray-500'}`}>SMS</span>
+                          )}
+                          {viaLabel && (
+                            <span className={outbound ? "text-white/60" : "text-[#aaaaaa]"}>{viaLabel}</span>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -18,17 +18,25 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '')
 }
 
+function stripPrefix(value: string): string {
+  return value.replace(/^whatsapp:/i, '')
+}
+
 export async function POST(req: Request) {
   try {
     // Twilio sends application/x-www-form-urlencoded
     const data = await req.formData()
 
-    const from = (data.get('From') as string | null) ?? ''
-    const to = (data.get('To') as string | null) ?? ''
+    const rawFrom = (data.get('From') as string | null) ?? ''
+    const rawTo = (data.get('To') as string | null) ?? ''
     const body = (data.get('Body') as string | null) ?? ''
     const messageSid = (data.get('MessageSid') as string | null) ?? ''
 
-    if (!from || !body) return twiml()
+    if (!rawFrom || !body) return twiml()
+
+    const channel = rawTo.startsWith('whatsapp:') ? 'whatsapp' : 'sms'
+    const from = stripPrefix(rawFrom)
+    const to = stripPrefix(rawTo)
 
     const fromNormalized = normalizePhone(from)
 
@@ -52,6 +60,8 @@ export async function POST(req: Request) {
       status: 'received',
       twilio_sid: messageSid,
       sent_at: new Date().toISOString(),
+      channel,
+      via_number: to,
     })
 
     return twiml()
