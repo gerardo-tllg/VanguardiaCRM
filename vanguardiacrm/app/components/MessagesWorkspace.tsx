@@ -48,6 +48,13 @@ type RawSmsRow = {
   cases: { client_name: string | null; phone: string | null } | null
 }
 
+function normalizeToE164(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+  return phone
+}
+
 function formatPhone(phone: string): string {
   const digits = phone.replace(/\D/g, '')
   if (digits.length === 11 && digits.startsWith('1')) {
@@ -123,8 +130,9 @@ export default function MessagesWorkspace() {
   const buildConversations = useCallback((rows: RawSmsRow[]): ConvRow[] => {
     const map = new Map<string, ConvRow>()
     for (const r of rows) {
-      const externalPhone = r.direction === "outbound" ? r.to_number : r.from_number
-      if (!externalPhone) continue
+      const rawPhone = r.direction === "outbound" ? r.to_number : r.from_number
+      if (!rawPhone) continue
+      const externalPhone = normalizeToE164(rawPhone)
       if (!map.has(externalPhone)) {
         map.set(externalPhone, {
           externalPhone,
@@ -158,10 +166,18 @@ export default function MessagesWorkspace() {
 
   const fetchThread = useCallback(async (phone: string) => {
     setThreadLoading(true)
+    // Build filter that matches both E.164 (+19561234567) and raw-digit (9561234567)
+    // variants so existing data with inconsistent formats still loads correctly
+    const norm = normalizeToE164(phone)
+    const digits10 = norm.replace(/^\+1/, '')
+    const filters = [`from_number.eq.${norm}`, `to_number.eq.${norm}`]
+    if (digits10 !== norm) {
+      filters.push(`from_number.eq.${digits10}`, `to_number.eq.${digits10}`)
+    }
     const { data, error } = await supabase
       .from("sms_messages")
       .select("id, direction, body, status, created_at, channel, via_number")
-      .or(`from_number.eq.${phone},to_number.eq.${phone}`)
+      .or(filters.join(','))
       .order("created_at", { ascending: true })
     setThreadLoading(false)
 

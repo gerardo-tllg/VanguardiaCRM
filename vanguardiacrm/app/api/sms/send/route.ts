@@ -35,9 +35,17 @@ export async function POST(req: Request) {
       )
     }
 
+    // Normalize to E.164 so stored to_number always matches Twilio's inbound From format
+    const toNormalized = (() => {
+      const digits = to.replace(/\D/g, '')
+      if (digits.length === 10) return `+1${digits}`
+      if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+      return to
+    })()
+
     const client = twilio(sid, token)
 
-    const twilioTo = channel === 'whatsapp' ? `whatsapp:${to}` : to
+    const twilioTo = channel === 'whatsapp' ? `whatsapp:${toNormalized}` : toNormalized
     const twilioFrom = channel === 'whatsapp' ? `whatsapp:${from}` : from
 
     const sent = await client.messages.create(
@@ -52,7 +60,7 @@ export async function POST(req: Request) {
       case_id: case_id ?? null,
       direction: 'outbound',
       from_number: from ?? null,
-      to_number: to,
+      to_number: toNormalized,
       body: message.trim(),
       status: 'sent',
       twilio_sid: sent.sid,
