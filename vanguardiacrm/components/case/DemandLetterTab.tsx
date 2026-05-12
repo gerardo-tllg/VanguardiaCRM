@@ -31,6 +31,7 @@ type DemandLetter = {
   model: string
   generated_at: string | null
   last_saved_at: string | null
+  demand_type: string | null
 }
 
 function formatTime(d: Date): string {
@@ -389,6 +390,7 @@ export default function DemandLetterTab({ caseId }: Props) {
         setLetter(data)
         setSavedContent(data.content ?? '')
         setEditContent(data.content ?? '')
+        if (data.demand_type) setDemandType(data.demand_type as 'stowers' | 'formal' | 'simple')
       }
       setLoading(false)
     }
@@ -457,6 +459,7 @@ export default function DemandLetterTab({ caseId }: Props) {
       generated_at: now,
       last_saved_at: now,
       updated_at: now,
+      demand_type: demandType,
       ...(letter?.id ? { id: letter.id } : {}),
     }
 
@@ -491,6 +494,7 @@ export default function DemandLetterTab({ caseId }: Props) {
       version: letter?.version ?? 1,
       last_saved_at: now,
       updated_at: now,
+      demand_type: demandType,
       ...(letter?.id ? { id: letter.id } : {}),
     }
 
