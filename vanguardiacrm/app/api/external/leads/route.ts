@@ -106,6 +106,7 @@ const { data: lead, error } = await supabaseAdmin
 
     status: "New",
     raw_payload: body,
+    lead_type: 'accidentintel',
   })
   .select()
   .single();

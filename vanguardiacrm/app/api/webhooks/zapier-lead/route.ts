@@ -159,6 +159,7 @@ export async function POST(req: Request) {
       market: body.market?.trim() || null,
       medium: body.medium?.trim() || body.utm_medium?.trim() || null,
       raw_payload: normalizeRawPayload(body.raw_payload, fallbackRawPayload),
+      lead_type: 'intake',
     };
 
     const { data: lead, error: leadError } = await supabaseAdmin

@@ -83,6 +83,7 @@ export async function POST(req: Request) {
       utm_campaign: normalizeString(body.utm_campaign) ?? "manual-entry",
       raw_payload: body.raw_payload ?? body,
       status: normalizeLeadStatus(body.status),
+      lead_type: 'manual',
     };
 
     const { data: lead, error } = await supabaseAdmin

@@ -78,4 +78,6 @@ export type LeadRecord = {
 
   updated_at: string | null;
   activated_at: string | null;
+
+  lead_type: string | null;
 };
