@@ -99,6 +99,9 @@ export async function PATCH(req: Request, context: RouteContext) {
     const { caseProviderId } = await context.params;
     const body = await req.json();
 
+    console.log("[case-provider PATCH] caseProviderId:", caseProviderId);
+    console.log("[case-provider PATCH] raw body:", JSON.stringify(body));
+
     const providerUpdate: Record<string, unknown> = {};
     const financialsUpdate: Record<string, unknown> = {};
 
@@ -112,6 +115,9 @@ export async function PATCH(req: Request, context: RouteContext) {
       }
     }
 
+    console.log("[case-provider PATCH] providerUpdate fields:", JSON.stringify(providerUpdate));
+    console.log("[case-provider PATCH] financialsUpdate fields (pre-upsert):", JSON.stringify(financialsUpdate));
+
     if (Object.keys(providerUpdate).length > 0) {
       const { error } = await supabaseAdmin
         .from("case_providers")
@@ -119,25 +125,34 @@ export async function PATCH(req: Request, context: RouteContext) {
         .eq("id", caseProviderId);
 
       if (error) {
+        console.error("[case-provider PATCH] case_providers update error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+      console.log("[case-provider PATCH] case_providers update OK");
     }
 
     if (Object.keys(financialsUpdate).length > 0) {
-      const { error } = await supabaseAdmin
-        .from("case_provider_financials")
-        .upsert(
-          { ...financialsUpdate, case_provider_id: caseProviderId },
-          { onConflict: "case_provider_id" }
-        );
+      const financialsData = { ...financialsUpdate, case_provider_id: caseProviderId };
+      console.log("[case-provider PATCH] financialsData being upserted:", JSON.stringify(financialsData));
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      const { data: upsertData, error: upsertError } = await supabaseAdmin
+        .from("case_provider_financials")
+        .upsert(financialsData, { onConflict: "case_provider_id" })
+        .select();
+
+      console.log("[case-provider PATCH] upsert response data:", JSON.stringify(upsertData));
+      console.log("[case-provider PATCH] upsert response error:", JSON.stringify(upsertError));
+
+      if (upsertError) {
+        return NextResponse.json({ error: upsertError.message }, { status: 500 });
       }
+    } else {
+      console.log("[case-provider PATCH] no financials fields in body — skipping upsert");
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
+    console.error("[case-provider PATCH] unexpected error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Server error" },
       { status: 500 }
