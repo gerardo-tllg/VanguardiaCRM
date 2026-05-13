@@ -1,3 +1,4 @@
+// Required env vars: NEXT_PUBLIC_APP_URL
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireApiUser } from "@/lib/auth/require-api-user";
@@ -62,6 +63,8 @@ export async function POST(req: NextRequest) {
     const assignedTo = normalizeString(body.assigned_to) ?? "Admin";
     const accidentDate = normalizeString(body.accident_date);
 
+    const preferredLanguage = body.preferred_language === 'es' ? 'es' : 'en'
+
     const rawPayload =
       body.raw_payload && typeof body.raw_payload === "object"
         ? body.raw_payload
@@ -94,6 +97,7 @@ export async function POST(req: NextRequest) {
         status,
         assigned_to: assignedTo,
         accident_date: accidentDate,
+        preferred_language: preferredLanguage,
         raw_payload: rawPayload,
         source_channel: "manual",
         source_medium: "internal",
@@ -107,6 +111,20 @@ export async function POST(req: NextRequest) {
         { error: error?.message || "Failed to create case" },
         { status: 500 }
       );
+    }
+
+    if (phone) {
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sms/phase-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseId: data.id,
+          phase: 'intake',
+          clientPhone: phone,
+          clientName: clientName,
+          language: preferredLanguage,
+        }),
+      }).catch(() => {})
     }
 
     return NextResponse.json({ success: true, case: data }, { status: 200 });

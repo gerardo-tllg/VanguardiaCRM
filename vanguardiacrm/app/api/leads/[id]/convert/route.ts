@@ -1,3 +1,4 @@
+// Required env vars: NEXT_PUBLIC_APP_URL
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireApiUser } from "@/lib/auth/require-api-user";
@@ -282,6 +283,10 @@ export async function POST(_req: Request, context: RouteContext) {
       source_channel: lead.source_channel,
     };
 
+    const preferredLanguage = ['es', 'spanish', 'español'].includes(
+      (clientLanguage ?? '').toLowerCase()
+    ) ? 'es' : 'en'
+
     const insertPayload = {
       lead_id: lead.id,
       case_number: caseNumber,
@@ -324,6 +329,7 @@ export async function POST(_req: Request, context: RouteContext) {
       source_medium: lead.source_medium ?? null,
       source_channel: lead.source_channel ?? null,
 
+      preferred_language: preferredLanguage,
       updated_at: new Date().toISOString(),
       raw_payload: mergedRawPayload,
     };
@@ -339,6 +345,20 @@ export async function POST(_req: Request, context: RouteContext) {
         { error: caseError?.message || "Failed to create case" },
         { status: 500 }
       );
+    }
+
+    if (insertPayload.phone) {
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sms/phase-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseId: newCase.id,
+          phase: 'intake',
+          clientPhone: insertPayload.phone,
+          clientName: insertPayload.client_name,
+          language: preferredLanguage,
+        }),
+      }).catch(() => {})
     }
 
     const { error: leadUpdateError } = await supabaseAdmin
