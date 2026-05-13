@@ -142,6 +142,17 @@ function formatMoney(value: number | null | undefined) {
   }).format(value ?? 0);
 }
 
+function formatToDecimal(val: string): string {
+  const cleaned = val.replace(/[$,]/g, "").trim();
+  if (cleaned === "") return "";
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? val : n.toFixed(2);
+}
+
+function stripForEdit(val: string): string {
+  return val.replace(/[$,]/g, "");
+}
+
 export default function CaseMedicalProvidersTab({
   caseNumber,
   initialCaseProviders,
@@ -191,11 +202,11 @@ export default function CaseMedicalProvidersTab({
       account_number: item.account_number ?? "",
       original_bill:
         financial?.original_bill !== null && financial?.original_bill !== undefined
-          ? String(financial.original_bill)
+          ? formatToDecimal(String(financial.original_bill))
           : "",
       paid_plus_owed:
         financial?.paid_plus_owed !== null && financial?.paid_plus_owed !== undefined
-          ? String(financial.paid_plus_owed)
+          ? formatToDecimal(String(financial.paid_plus_owed))
           : "",
     });
   }
@@ -215,7 +226,11 @@ export default function CaseMedicalProvidersTab({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({
+          ...editForm,
+          original_bill: stripForEdit(editForm.original_bill),
+          paid_plus_owed: stripForEdit(editForm.paid_plus_owed),
+        }),
       });
 
       const data: { error?: string } = await res.json();
@@ -684,28 +699,60 @@ export default function CaseMedicalProvidersTab({
                         placeholder="Account number"
                         className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
                       />
-                      <input
-                        value={editForm.original_bill}
-                        onChange={(e) =>
-                          setEditForm((prev) => ({
-                            ...prev,
-                            original_bill: e.target.value,
-                          }))
-                        }
-                        placeholder="Original bill"
-                        className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
-                      />
-                      <input
-                        value={editForm.paid_plus_owed}
-                        onChange={(e) =>
-                          setEditForm((prev) => ({
-                            ...prev,
-                            paid_plus_owed: e.target.value,
-                          }))
-                        }
-                        placeholder="Paid + owed"
-                        className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
-                      />
+                      <div className="relative w-full">
+                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
+                        <input
+                          type="text"
+                          value={editForm.original_bill}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              original_bill: e.target.value,
+                            }))
+                          }
+                          onBlur={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              original_bill: formatToDecimal(e.target.value),
+                            }))
+                          }
+                          onFocus={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              original_bill: stripForEdit(e.target.value),
+                            }))
+                          }
+                          placeholder="0.00"
+                          className="w-full rounded-md border border-[#d9d9d9] py-2 pl-7 pr-3 text-sm"
+                        />
+                      </div>
+                      <div className="relative w-full">
+                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
+                        <input
+                          type="text"
+                          value={editForm.paid_plus_owed}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              paid_plus_owed: e.target.value,
+                            }))
+                          }
+                          onBlur={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              paid_plus_owed: formatToDecimal(e.target.value),
+                            }))
+                          }
+                          onFocus={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              paid_plus_owed: stripForEdit(e.target.value),
+                            }))
+                          }
+                          placeholder="0.00"
+                          className="w-full rounded-md border border-[#d9d9d9] py-2 pl-7 pr-3 text-sm"
+                        />
+                      </div>
 
                       <label className="flex items-center gap-2 text-sm text-[#2b2b2b]">
                         <input

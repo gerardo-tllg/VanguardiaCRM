@@ -36,6 +36,23 @@ const FINANCIALS_FIELDS = new Set([
   "insurance_notes",
 ]);
 
+const NUMERIC_FINANCIALS_FIELDS = new Set([
+  "original_bill",
+  "adjusted_bill",
+  "client_paid",
+  "medpay_pip_paid",
+  "insurance_paid",
+  "still_owed",
+  "paid_plus_owed",
+]);
+
+function sanitizeNumeric(val: unknown): number | null {
+  if (val === "" || val === null || val === undefined) return null;
+  const cleaned = String(val).replace(/[$,]/g, "");
+  const n = Number(cleaned);
+  return isNaN(n) ? null : n;
+}
+
 export async function GET(_req: Request, context: RouteContext) {
   try {
     const { response } = await requireApiUser();
@@ -86,8 +103,13 @@ export async function PATCH(req: Request, context: RouteContext) {
     const financialsUpdate: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(body)) {
-      if (CASE_PROVIDER_FIELDS.has(key)) providerUpdate[key] = value;
-      else if (FINANCIALS_FIELDS.has(key)) financialsUpdate[key] = value;
+      if (CASE_PROVIDER_FIELDS.has(key)) {
+        providerUpdate[key] = value;
+      } else if (FINANCIALS_FIELDS.has(key)) {
+        financialsUpdate[key] = NUMERIC_FINANCIALS_FIELDS.has(key)
+          ? sanitizeNumeric(value)
+          : value;
+      }
     }
 
     if (Object.keys(providerUpdate).length > 0) {
