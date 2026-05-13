@@ -59,6 +59,27 @@ function formatPhone(phone: string | null) {
   return phone;
 }
 
+function formatCaseType(raw: string): string {
+  const map: Record<string, string> = {
+    motor_vehicle_accident: "Motor Vehicle Accident",
+    slip_and_fall:          "Slip & Fall",
+    slip___fall:            "Slip & Fall",
+    premises_liability:     "Premises Liability",
+    wrongful_death:         "Wrongful Death",
+    product_liability:      "Product Liability",
+    dog_bite:               "Dog Bite",
+    trucking_accident:      "Trucking Accident",
+    motorcycle_accident:    "Motorcycle Accident",
+    pedestrian_accident:    "Pedestrian Accident",
+    other:                  "Other",
+  };
+  return (
+    map[raw?.toLowerCase()] ??
+    raw?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) ??
+    "Unknown"
+  );
+}
+
 export default async function DashboardPage() {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -222,7 +243,7 @@ export default async function DashboardPage() {
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         {c.case_type && (
                           <span className="rounded-full bg-[#f3f3f3] px-2 py-0.5 text-xs text-[#6b6b6b]">
-                            {c.case_type}
+                            {formatCaseType(c.case_type)}
                           </span>
                         )}
                         <span
@@ -261,6 +282,12 @@ export default async function DashboardPage() {
               recentLeads.map((lead) => {
                 const badgeClass =
                   LEAD_STATUS_BADGE[lead.status] ?? "bg-gray-100 text-gray-500";
+                const isAutoLead =
+                  !lead.client_name?.trim() ||
+                  lead.client_name.trim() === "AccidentIntel Auto-Lead";
+                const displayName = isAutoLead
+                  ? formatPhone(lead.phone)
+                  : lead.client_name;
                 return (
                   <Link
                     key={lead.id}
@@ -269,12 +296,12 @@ export default async function DashboardPage() {
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-[#2b2b2b]">
-                        {lead.client_name ?? "—"}
+                        {displayName}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         {lead.accident_type && (
                           <span className="rounded-full bg-[#f3f3f3] px-2 py-0.5 text-xs text-[#6b6b6b]">
-                            {lead.accident_type}
+                            {formatCaseType(lead.accident_type)}
                           </span>
                         )}
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass}`}>
