@@ -107,7 +107,7 @@ function getFinancial(fins: CaseProviderRow['case_provider_financials']) {
   return fins[0]
 }
 
-function calculateStillOwed(financial: CaseProviderRow['case_provider_financials'][0] | null | undefined): number {
+function calculateStillOwed(financial: { original_bill: number | null; adjusted_bill: number | null; still_owed?: number | null; client_paid?: number | null; medpay_pip_paid?: number | null; insurance_paid?: number | null } | null | undefined): number {
   if (!financial) return 0
   const original = financial.original_bill ?? 0
   const adjusted = financial.adjusted_bill ?? 0
