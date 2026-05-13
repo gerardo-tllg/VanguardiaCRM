@@ -47,6 +47,7 @@ export default async function CaseClientPage({ params }: PageProps) {
         city: typeof client.city === "string" ? client.city : "",
         state: typeof client.state === "string" ? client.state : "",
         zip: typeof client.zip === "string" ? client.zip : "",
+        preferred_language: caseRecord.preferred_language ?? "en",
       }}
     />
   );

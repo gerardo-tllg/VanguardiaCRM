@@ -15,6 +15,7 @@ type ClientFormData = {
   city: string;
   state: string;
   zip: string;
+  preferred_language: string;
 };
 
 type Props = {
@@ -176,6 +177,10 @@ export default function CaseClientTab({ caseNumber, initialData }: Props) {
                     <InfoRow label="Phone" value={displayValue(form.phone)} />
                     <InfoRow label="Email" value={displayValue(form.email)} />
                     <InfoRow label="Address" value={displayValue(fullAddress)} />
+                    <InfoRow
+                      label="Language Preference"
+                      value={form.preferred_language === 'es' ? 'Español' : 'English'}
+                    />
                   </tbody>
                 </table>
               </div>
@@ -238,6 +243,36 @@ export default function CaseClientTab({ caseNumber, initialData }: Props) {
                     onChange={(e) => updateField("phone", e.target.value)}
                     className="w-full rounded-md border border-[#d9d9d9] px-4 py-2"
                   />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#2b2b2b]">
+                    Language Preference
+                  </label>
+                  <div className="flex overflow-hidden rounded-md border border-[#d9d9d9]">
+                    <button
+                      type="button"
+                      onClick={() => updateField("preferred_language", "en")}
+                      className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                        form.preferred_language !== 'es'
+                          ? 'bg-[#4b0a06] text-white'
+                          : 'bg-white text-[#2b2b2b] hover:bg-[#f7f7f7]'
+                      }`}
+                    >
+                      English
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateField("preferred_language", "es")}
+                      className={`flex-1 border-l border-[#d9d9d9] py-2 text-sm font-medium transition-colors ${
+                        form.preferred_language === 'es'
+                          ? 'bg-[#4b0a06] text-white'
+                          : 'bg-white text-[#2b2b2b] hover:bg-[#f7f7f7]'
+                      }`}
+                    >
+                      Español
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -12,7 +12,7 @@ export default async function CasePipelinePage({ params }: PageProps) {
 
   const { data, error } = await supabaseAdmin
     .from("cases")
-    .select("id, case_status, phone, client_name")
+    .select("id, case_status, phone, client_name, preferred_language")
     .eq("id", caseId)
     .single();
 
@@ -24,6 +24,7 @@ export default async function CasePipelinePage({ params }: PageProps) {
       currentStatus={(data.case_status as CaseStatus) ?? "intake"}
       clientPhone={data.phone ?? undefined}
       clientName={data.client_name ?? undefined}
+      preferredLanguage={data.preferred_language ?? 'en'}
     />
   );
 }

@@ -56,6 +56,7 @@ export async function PATCH(req: Request, context: RouteContext) {
       client_name: body.client_name ?? existingCase.client_name,
       phone: body.phone ?? existingCase.phone,
       email: body.email ?? existingCase.email,
+      preferred_language: body.preferred_language === 'es' ? 'es' : (existingCase.preferred_language ?? 'en'),
       raw_payload: nextRaw,
     };
 

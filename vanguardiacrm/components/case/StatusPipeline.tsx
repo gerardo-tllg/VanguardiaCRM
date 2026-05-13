@@ -10,10 +10,11 @@ type Props = {
   currentStatus?: CaseStatus
   clientPhone?: string
   clientName?: string
+  preferredLanguage?: string
   onStatusChange?: (newStatus: CaseStatus) => void
 }
 
-export default function StatusPipeline({ caseId, currentStatus = 'intake', clientPhone, clientName, onStatusChange }: Props) {
+export default function StatusPipeline({ caseId, currentStatus = 'intake', clientPhone, clientName, preferredLanguage, onStatusChange }: Props) {
   const [localStatus, setLocalStatus] = useState<CaseStatus>(currentStatus)
   const [selectedPhase, setSelectedPhase] = useState<CaseStatus | null>(null)
   const [checkedTriggers, setCheckedTriggers] = useState<Set<string>>(new Set())
@@ -78,6 +79,7 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', clien
           phase: nextPhase.status,
           clientPhone,
           clientName,
+          language: preferredLanguage ?? 'en',
         }),
       }).catch(() => {})
     }
