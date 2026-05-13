@@ -8,6 +8,7 @@ const PUBLIC_ROUTES = [
   "/api/external/leads",
   "/api/sms/webhook",
   "/api/sms/status",
+  "/api/sms/phase-notify",
 ];
 
 function isPublicRoute(pathname: string) {
