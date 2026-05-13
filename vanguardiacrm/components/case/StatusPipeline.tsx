@@ -8,10 +8,12 @@ import { PIPELINE, getPhaseIndex, getNextPhase, PipelinePhase } from '@/lib/case
 type Props = {
   caseId: string
   currentStatus?: CaseStatus
+  clientPhone?: string
+  clientName?: string
   onStatusChange?: (newStatus: CaseStatus) => void
 }
 
-export default function StatusPipeline({ caseId, currentStatus = 'intake', onStatusChange }: Props) {
+export default function StatusPipeline({ caseId, currentStatus = 'intake', clientPhone, clientName, onStatusChange }: Props) {
   const [localStatus, setLocalStatus] = useState<CaseStatus>(currentStatus)
   const [selectedPhase, setSelectedPhase] = useState<CaseStatus | null>(null)
   const [checkedTriggers, setCheckedTriggers] = useState<Set<string>>(new Set())
@@ -66,6 +68,19 @@ export default function StatusPipeline({ caseId, currentStatus = 'intake', onSta
     setLocalStatus(nextPhase.status)
     setSelectedPhase(null)
     onStatusChange?.(nextPhase.status)
+
+    if (clientPhone) {
+      fetch('/api/sms/phase-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseId,
+          phase: nextPhase.status,
+          clientPhone,
+          clientName,
+        }),
+      }).catch(() => {})
+    }
   }
 
   return (
