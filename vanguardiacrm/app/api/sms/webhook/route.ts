@@ -64,6 +64,15 @@ export async function POST(req: Request) {
       via_number: to,
     })
 
+    // Backfill any prior messages from this number that were saved without a case_id
+    if (matchedCase) {
+      await supabaseAdmin
+        .from('sms_messages')
+        .update({ case_id: matchedCase.id })
+        .eq('from_number', from)
+        .is('case_id', null)
+    }
+
     return twiml()
   } catch (err) {
     console.error('SMS webhook error:', err)

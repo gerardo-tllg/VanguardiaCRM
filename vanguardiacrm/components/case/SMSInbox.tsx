@@ -52,14 +52,32 @@ export default function SMSInbox({ caseId, clientPhone }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const fetchMessages = useCallback(async () => {
-    const { data } = await supabase
-      .from('sms_messages')
-      .select('*')
-      .eq('case_id', caseId)
-      .order('sent_at', { ascending: true })
+    let query = supabase.from('sms_messages').select('*')
 
-    if (data) setMessages(data)
-  }, [caseId, supabase])
+    if (clientPhone) {
+      const digits = clientPhone.replace(/\D/g, '')
+      const e164 =
+        digits.length === 10
+          ? `+1${digits}`
+          : digits.length === 11 && digits.startsWith('1')
+            ? `+${digits}`
+            : clientPhone
+      query = query.or(`case_id.eq.${caseId},from_number.eq.${e164},to_number.eq.${e164}`)
+    } else {
+      query = query.eq('case_id', caseId)
+    }
+
+    const { data } = await query.order('sent_at', { ascending: true })
+
+    if (data) {
+      const seen = new Set<string>()
+      setMessages(data.filter((msg) => {
+        if (seen.has(msg.id)) return false
+        seen.add(msg.id)
+        return true
+      }))
+    }
+  }, [caseId, clientPhone, supabase])
 
   useEffect(() => {
     async function init() {
