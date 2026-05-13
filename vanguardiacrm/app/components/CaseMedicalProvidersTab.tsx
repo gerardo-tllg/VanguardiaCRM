@@ -706,28 +706,33 @@ export default function CaseMedicalProvidersTab({
                         placeholder="Treatment description"
                         className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
                       />
-                      <input
+                      <select
                         value={editForm.treatment_status}
                         onChange={(e) =>
-                          setEditForm((prev) => ({
-                            ...prev,
-                            treatment_status: e.target.value,
-                          }))
+                          setEditForm((prev) => ({ ...prev, treatment_status: e.target.value }))
                         }
-                        placeholder="Treatment status"
-                        className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
-                      />
-                      <input
+                        className="w-full rounded-lg border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
+                      >
+                        <option value="">Treatment status</option>
+                        <option>Active</option>
+                        <option>Discharged</option>
+                        <option>On Hold</option>
+                        <option>Pending</option>
+                        <option>Referred Out</option>
+                      </select>
+                      <select
                         value={editForm.records_status}
                         onChange={(e) =>
-                          setEditForm((prev) => ({
-                            ...prev,
-                            records_status: e.target.value,
-                          }))
+                          setEditForm((prev) => ({ ...prev, records_status: e.target.value }))
                         }
-                        placeholder="Records status"
-                        className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
-                      />
+                        className="w-full rounded-lg border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
+                      >
+                        <option value="">Records status</option>
+                        <option>Not Requested</option>
+                        <option>Requested</option>
+                        <option>Received</option>
+                        <option>Incomplete</option>
+                      </select>
                     </div>
                   ) : (
                     <div className="space-y-2 text-sm text-[#444444]">
@@ -754,14 +759,20 @@ export default function CaseMedicalProvidersTab({
 
                   {editingId === item.id ? (
                     <div className="space-y-3">
-                      <input
+                      <select
                         value={editForm.billing_status}
                         onChange={(e) =>
                           setEditForm((prev) => ({ ...prev, billing_status: e.target.value }))
                         }
-                        placeholder="Billing status"
-                        className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
-                      />
+                        className="w-full rounded-lg border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
+                      >
+                        <option value="">Billing status</option>
+                        <option>Not Requested</option>
+                        <option>Requested</option>
+                        <option>Received</option>
+                        <option>Incomplete</option>
+                        <option>On Hold</option>
+                      </select>
                       <input
                         value={editForm.account_number}
                         onChange={(e) =>
