@@ -90,6 +90,11 @@ type CaseProviderEditForm = {
   lien_filed: boolean;
   account_number: string;
   original_bill: string;
+  adjusted_bill: string;
+  client_paid: string;
+  medpay_pip_paid: string;
+  insurance_paid: string;
+  still_owed: string;
   paid_plus_owed: string;
 };
 
@@ -118,6 +123,11 @@ const EMPTY_CASE_PROVIDER_FORM: CaseProviderEditForm = {
   lien_filed: false,
   account_number: "",
   original_bill: "",
+  adjusted_bill: "",
+  client_paid: "",
+  medpay_pip_paid: "",
+  insurance_paid: "",
+  still_owed: "",
   paid_plus_owed: "",
 };
 
@@ -203,13 +213,19 @@ export default function CaseMedicalProvidersTab({
       lien_filed: item.lien_filed ?? false,
       account_number: item.account_number ?? "",
       original_bill:
-        financial?.original_bill !== null && financial?.original_bill !== undefined
-          ? formatToDecimal(String(financial.original_bill))
-          : "",
+        financial?.original_bill != null ? formatToDecimal(String(financial.original_bill)) : "",
+      adjusted_bill:
+        financial?.adjusted_bill != null ? formatToDecimal(String(financial.adjusted_bill)) : "",
+      client_paid:
+        financial?.client_paid != null ? formatToDecimal(String(financial.client_paid)) : "",
+      medpay_pip_paid:
+        financial?.medpay_pip_paid != null ? formatToDecimal(String(financial.medpay_pip_paid)) : "",
+      insurance_paid:
+        financial?.insurance_paid != null ? formatToDecimal(String(financial.insurance_paid)) : "",
+      still_owed:
+        financial?.still_owed != null ? formatToDecimal(String(financial.still_owed)) : "",
       paid_plus_owed:
-        financial?.paid_plus_owed !== null && financial?.paid_plus_owed !== undefined
-          ? formatToDecimal(String(financial.paid_plus_owed))
-          : "",
+        financial?.paid_plus_owed != null ? formatToDecimal(String(financial.paid_plus_owed)) : "",
     });
   }
 
@@ -231,6 +247,11 @@ export default function CaseMedicalProvidersTab({
         body: JSON.stringify({
           ...editForm,
           original_bill: stripForEdit(editForm.original_bill),
+          adjusted_bill: stripForEdit(editForm.adjusted_bill),
+          client_paid: stripForEdit(editForm.client_paid),
+          medpay_pip_paid: stripForEdit(editForm.medpay_pip_paid),
+          insurance_paid: stripForEdit(editForm.insurance_paid),
+          still_owed: stripForEdit(editForm.still_owed),
           paid_plus_owed: stripForEdit(editForm.paid_plus_owed),
         }),
       });
@@ -241,10 +262,12 @@ export default function CaseMedicalProvidersTab({
         throw new Error(data.error || "Failed to save case provider");
       }
 
-      const rawBill = editForm.original_bill.replace(/[$,]/g, "");
-      const rawPaid = editForm.paid_plus_owed.replace(/[$,]/g, "");
-      const savedBill = rawBill === "" ? null : parseFloat(rawBill);
-      const savedPaid = rawPaid === "" ? null : parseFloat(rawPaid);
+      function parseField(val: string): number | null {
+        const s = val.replace(/[$,]/g, "");
+        if (s === "") return null;
+        const n = parseFloat(s);
+        return isNaN(n) ? null : n;
+      }
 
       setCaseProviders((prev) =>
         prev.map((p) => {
@@ -262,13 +285,13 @@ export default function CaseMedicalProvidersTab({
             case_provider_financials: [
               {
                 id: existing?.id ?? "",
-                original_bill: isNaN(savedBill as number) ? null : savedBill,
-                adjusted_bill: existing?.adjusted_bill ?? null,
-                client_paid: existing?.client_paid ?? null,
-                medpay_pip_paid: existing?.medpay_pip_paid ?? null,
-                insurance_paid: existing?.insurance_paid ?? null,
-                still_owed: existing?.still_owed ?? null,
-                paid_plus_owed: isNaN(savedPaid as number) ? null : savedPaid,
+                original_bill: parseField(editForm.original_bill),
+                adjusted_bill: parseField(editForm.adjusted_bill),
+                client_paid: parseField(editForm.client_paid),
+                medpay_pip_paid: parseField(editForm.medpay_pip_paid),
+                insurance_paid: parseField(editForm.insurance_paid),
+                still_owed: parseField(editForm.still_owed),
+                paid_plus_owed: parseField(editForm.paid_plus_owed),
                 records_requested_date: existing?.records_requested_date ?? null,
                 records_received_date: existing?.records_received_date ?? null,
                 bills_requested_date: existing?.bills_requested_date ?? null,
@@ -722,10 +745,7 @@ export default function CaseMedicalProvidersTab({
                       <input
                         value={editForm.billing_status}
                         onChange={(e) =>
-                          setEditForm((prev) => ({
-                            ...prev,
-                            billing_status: e.target.value,
-                          }))
+                          setEditForm((prev) => ({ ...prev, billing_status: e.target.value }))
                         }
                         placeholder="Billing status"
                         className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
@@ -733,78 +753,49 @@ export default function CaseMedicalProvidersTab({
                       <input
                         value={editForm.account_number}
                         onChange={(e) =>
-                          setEditForm((prev) => ({
-                            ...prev,
-                            account_number: e.target.value,
-                          }))
+                          setEditForm((prev) => ({ ...prev, account_number: e.target.value }))
                         }
                         placeholder="Account number"
                         className="w-full rounded-md border border-[#d9d9d9] px-3 py-2 text-sm"
                       />
-                      <div className="relative w-full">
-                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
-                        <input
-                          type="text"
-                          value={editForm.original_bill}
-                          onChange={(e) =>
-                            setEditForm((prev) => ({
-                              ...prev,
-                              original_bill: e.target.value,
-                            }))
-                          }
-                          onBlur={(e) =>
-                            setEditForm((prev) => ({
-                              ...prev,
-                              original_bill: formatToDecimal(e.target.value),
-                            }))
-                          }
-                          onFocus={(e) =>
-                            setEditForm((prev) => ({
-                              ...prev,
-                              original_bill: stripForEdit(e.target.value),
-                            }))
-                          }
-                          placeholder="0.00"
-                          className="w-full rounded-md border border-[#d9d9d9] py-2 pl-7 pr-3 text-sm"
-                        />
-                      </div>
-                      <div className="relative w-full">
-                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
-                        <input
-                          type="text"
-                          value={editForm.paid_plus_owed}
-                          onChange={(e) =>
-                            setEditForm((prev) => ({
-                              ...prev,
-                              paid_plus_owed: e.target.value,
-                            }))
-                          }
-                          onBlur={(e) =>
-                            setEditForm((prev) => ({
-                              ...prev,
-                              paid_plus_owed: formatToDecimal(e.target.value),
-                            }))
-                          }
-                          onFocus={(e) =>
-                            setEditForm((prev) => ({
-                              ...prev,
-                              paid_plus_owed: stripForEdit(e.target.value),
-                            }))
-                          }
-                          placeholder="0.00"
-                          className="w-full rounded-md border border-[#d9d9d9] py-2 pl-7 pr-3 text-sm"
-                        />
-                      </div>
+                      {(
+                        [
+                          ["original_bill", "Original Bill"],
+                          ["adjusted_bill", "Adjusted Bill"],
+                          ["client_paid", "Client Paid"],
+                          ["medpay_pip_paid", "MedPay / PIP Paid"],
+                          ["insurance_paid", "Insurance Paid"],
+                          ["still_owed", "Still Owed"],
+                          ["paid_plus_owed", "Paid + Owed"],
+                        ] as [keyof CaseProviderEditForm, string][]
+                      ).map(([field, label]) => (
+                        <div key={field} className="relative w-full">
+                          <span className="pointer-events-none absolute left-3 top-2 text-xs text-[#999999]">{label}</span>
+                          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-end pb-2 text-sm text-[#666666]">$</span>
+                          <input
+                            type="text"
+                            value={editForm[field] as string}
+                            onChange={(e) =>
+                              setEditForm((prev) => ({ ...prev, [field]: e.target.value }))
+                            }
+                            onBlur={(e) =>
+                              setEditForm((prev) => ({ ...prev, [field]: formatToDecimal(e.target.value) }))
+                            }
+                            onFocus={(e) =>
+                              setEditForm((prev) => ({ ...prev, [field]: stripForEdit(e.target.value) }))
+                            }
+                            placeholder="0.00"
+                            className="w-full rounded-md border border-[#d9d9d9] pb-2 pl-7 pr-3 pt-5 text-sm"
+                          />
+                        </div>
+                      ))}
 
                       <label className="flex items-center gap-2 text-sm text-[#2b2b2b]">
                         <input
                           type="checkbox"
                           checked={editForm.signed_lop}
                           onChange={(e) =>
-                            setEditForm((prev) => ({
-                              ...prev,
-                              signed_lop: e.target.checked,
-                            }))
+                            setEditForm((prev) => ({ ...prev, signed_lop: e.target.checked }))
                           }
                         />
                         Signed LOP
@@ -815,10 +806,7 @@ export default function CaseMedicalProvidersTab({
                           type="checkbox"
                           checked={editForm.lien_filed}
                           onChange={(e) =>
-                            setEditForm((prev) => ({
-                              ...prev,
-                              lien_filed: e.target.checked,
-                            }))
+                            setEditForm((prev) => ({ ...prev, lien_filed: e.target.checked }))
                           }
                         />
                         Lien Filed
@@ -837,6 +825,26 @@ export default function CaseMedicalProvidersTab({
                       <div>
                         <span className="font-medium">Original Bill:</span>{" "}
                         {formatMoney(financial?.original_bill)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Adjusted Bill:</span>{" "}
+                        {formatMoney(financial?.adjusted_bill)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Client Paid:</span>{" "}
+                        {formatMoney(financial?.client_paid)}
+                      </div>
+                      <div>
+                        <span className="font-medium">MedPay / PIP:</span>{" "}
+                        {formatMoney(financial?.medpay_pip_paid)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Insurance Paid:</span>{" "}
+                        {formatMoney(financial?.insurance_paid)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Still Owed:</span>{" "}
+                        {formatMoney(financial?.still_owed)}
                       </div>
                       <div>
                         <span className="font-medium">Paid + Owed:</span>{" "}
