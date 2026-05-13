@@ -163,6 +163,18 @@ function stripForEdit(val: string): string {
   return val.replace(/[$,]/g, "");
 }
 
+function calculateStillOwed(financial: FinancialItem | null | undefined): number {
+  if (!financial) return 0;
+  const original = financial.original_bill ?? 0;
+  const adjusted = financial.adjusted_bill ?? 0;
+  const clientPaid = financial.client_paid ?? 0;
+  const medpay = financial.medpay_pip_paid ?? 0;
+  const insurancePaid = financial.insurance_paid ?? 0;
+  const bill = adjusted > 0 ? adjusted : original;
+  const totalPaid = clientPaid + medpay + insurancePaid;
+  return Math.max(0, bill - totalPaid);
+}
+
 export default function CaseMedicalProvidersTab({
   caseNumber,
   initialCaseProviders,
@@ -844,7 +856,7 @@ export default function CaseMedicalProvidersTab({
                       </div>
                       <div>
                         <span className="font-medium">Still Owed:</span>{" "}
-                        {formatMoney(financial?.still_owed)}
+                        {formatMoney(financial?.still_owed ?? calculateStillOwed(financial))}
                       </div>
                       <div>
                         <span className="font-medium">Paid + Owed:</span>{" "}

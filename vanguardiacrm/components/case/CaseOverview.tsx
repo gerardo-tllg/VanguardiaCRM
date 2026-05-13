@@ -107,6 +107,18 @@ function getFinancial(fins: CaseProviderRow['case_provider_financials']) {
   return fins[0]
 }
 
+function calculateStillOwed(financial: CaseProviderRow['case_provider_financials'][0] | null | undefined): number {
+  if (!financial) return 0
+  const original = financial.original_bill ?? 0
+  const adjusted = financial.adjusted_bill ?? 0
+  const clientPaid = financial.client_paid ?? 0
+  const medpay = financial.medpay_pip_paid ?? 0
+  const insurancePaid = financial.insurance_paid ?? 0
+  const bill = adjusted > 0 ? adjusted : original
+  const totalPaid = clientPaid + medpay + insurancePaid
+  return Math.max(0, bill - totalPaid)
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#9b9b9b]">
@@ -140,7 +152,10 @@ export default function CaseOverview({ caseData, defendants, caseProviders }: Pr
     descLower.includes('admitted liability')
 
   const totalBilled = caseProviders.reduce((sum, p) => sum + (getFinancial(p.case_provider_financials)?.original_bill ?? 0), 0)
-  const totalOwed   = caseProviders.reduce((sum, p) => sum + (getFinancial(p.case_provider_financials)?.still_owed   ?? 0), 0)
+  const totalOwed   = caseProviders.reduce((sum, p) => {
+    const fin = getFinancial(p.case_provider_financials)
+    return sum + (fin?.still_owed ?? calculateStillOwed(fin))
+  }, 0)
 
   console.log('[overview] provider financials:', caseProviders.map(p => ({ name: Array.isArray(p.providers) ? p.providers[0]?.name : p.providers?.name, financials: p.case_provider_financials })))
 
@@ -356,7 +371,7 @@ export default function CaseOverview({ caseData, defendants, caseProviders }: Pr
                       <td className="whitespace-nowrap py-2.5 pr-4 text-[#6b6b6b]">{p.first_visit_date ? formatDate(p.first_visit_date) : '—'}</td>
                       <td className="whitespace-nowrap py-2.5 pr-4 text-[#6b6b6b]">{p.last_visit_date  ? formatDate(p.last_visit_date)  : '—'}</td>
                       <td className="whitespace-nowrap py-2.5 pr-4 text-[#2b2b2b]">{formatUSD(fin?.original_bill ?? null)}</td>
-                      <td className="whitespace-nowrap py-2.5 pr-4 font-medium text-[#b91c1c]">{formatUSD(fin?.still_owed ?? null)}</td>
+                      <td className="whitespace-nowrap py-2.5 pr-4 font-medium text-[#b91c1c]">{formatUSD(fin?.still_owed ?? calculateStillOwed(fin))}</td>
                       <td className="py-2.5 pr-4 text-[#6b6b6b]">{p.records_status ?? '—'}</td>
                       <td className="py-2.5 pr-4 text-[#6b6b6b]">{p.billing_status  ?? '—'}</td>
                     </tr>
