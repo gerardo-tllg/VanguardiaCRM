@@ -49,6 +49,13 @@ function getNextSequence(existingCaseNumbers: string[], prefix: string) {
   return String(maxUsed + 1).padStart(4, "0");
 }
 
+function toE164(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+  return phone
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -292,7 +299,7 @@ export async function POST(_req: Request, context: RouteContext) {
       case_number: caseNumber,
       case_type: normalizedType,
       client_name: lead.client_name,
-      phone: lead.phone ?? null,
+      phone: lead.phone ? toE164(lead.phone) : null,
       email: lead.email ?? null,
       status: "Open",
       phase: "Welcome",
@@ -358,7 +365,18 @@ export async function POST(_req: Request, context: RouteContext) {
           clientName: insertPayload.client_name,
           language: preferredLanguage,
         }),
-      }).catch(() => {})
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const text = await res.text()
+            console.error('[phase-notify] intake SMS error response:', res.status, text)
+          } else {
+            console.log('[phase-notify] intake SMS sent for case', newCase.id)
+          }
+        })
+        .catch((err) => {
+          console.error('[phase-notify] intake SMS fetch failed:', err)
+        })
     }
 
     const { error: leadUpdateError } = await supabaseAdmin

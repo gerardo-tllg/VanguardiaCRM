@@ -7,6 +7,13 @@ function normalizeString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function toE164(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+  return phone
+}
+
 function normalizeCaseTypeForStorage(value: string | null | undefined) {
   if (!value) return "unknown";
 
@@ -54,7 +61,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const clientName = normalizeString(body.client_name);
-    const phone = normalizeString(body.phone);
+    const phone = normalizeString(body.phone) ? toE164(normalizeString(body.phone)!) : null;
     const email = normalizeString(body.email);
     const caseType = normalizeCaseTypeForStorage(
       normalizeString(body.case_type) ?? "Personal Injury"
@@ -124,7 +131,18 @@ export async function POST(req: NextRequest) {
           clientName: clientName,
           language: preferredLanguage,
         }),
-      }).catch(() => {})
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const text = await res.text()
+            console.error('[phase-notify] intake SMS error response:', res.status, text)
+          } else {
+            console.log('[phase-notify] intake SMS sent for case', data.id)
+          }
+        })
+        .catch((err) => {
+          console.error('[phase-notify] intake SMS fetch failed:', err)
+        })
     }
 
     return NextResponse.json({ success: true, case: data }, { status: 200 });
