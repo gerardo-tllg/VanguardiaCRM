@@ -74,6 +74,8 @@ export default async function CaseOverviewPage({ params }: PageProps) {
       .order("created_at", { ascending: true }),
   ]);
 
+  console.log('[overview] providers data:', JSON.stringify(providersResult.data, null, 2))
+
   if (caseResult.error || !caseResult.data) notFound();
 
   const c = caseResult.data;

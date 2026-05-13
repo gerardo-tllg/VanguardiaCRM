@@ -142,6 +142,8 @@ export default function CaseOverview({ caseData, defendants, caseProviders }: Pr
   const totalBilled = caseProviders.reduce((sum, p) => sum + (getFinancial(p.case_provider_financials)?.original_bill ?? 0), 0)
   const totalOwed   = caseProviders.reduce((sum, p) => sum + (getFinancial(p.case_provider_financials)?.still_owed   ?? 0), 0)
 
+  console.log('[overview] provider financials:', caseProviders.map(p => ({ name: Array.isArray(p.providers) ? p.providers[0]?.name : p.providers?.name, financials: p.case_provider_financials })))
+
   return (
     <div className="space-y-4">
 
