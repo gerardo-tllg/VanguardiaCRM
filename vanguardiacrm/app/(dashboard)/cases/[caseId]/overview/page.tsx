@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import CaseOverview from "@/components/case/CaseOverview";
 
+export const dynamic = 'force-dynamic';
+
 type PageProps = {
   params: Promise<{ caseId: string }>;
 };
