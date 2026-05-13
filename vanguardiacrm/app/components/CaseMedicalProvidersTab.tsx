@@ -160,6 +160,8 @@ export default function CaseMedicalProvidersTab({
 }: Props) {
   const router = useRouter();
 
+  const [caseProviders, setCaseProviders] = useState<CaseProviderItem[]>(initialCaseProviders);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] =
     useState<CaseProviderEditForm>(EMPTY_CASE_PROVIDER_FORM);
@@ -238,6 +240,46 @@ export default function CaseMedicalProvidersTab({
       if (!res.ok) {
         throw new Error(data.error || "Failed to save case provider");
       }
+
+      const rawBill = editForm.original_bill.replace(/[$,]/g, "");
+      const rawPaid = editForm.paid_plus_owed.replace(/[$,]/g, "");
+      const savedBill = rawBill === "" ? null : parseFloat(rawBill);
+      const savedPaid = rawPaid === "" ? null : parseFloat(rawPaid);
+
+      setCaseProviders((prev) =>
+        prev.map((p) => {
+          if (p.id !== caseProviderId) return p;
+          const existing = getFinancial(p.case_provider_financials);
+          return {
+            ...p,
+            treatment_description: editForm.treatment_description || null,
+            treatment_status: editForm.treatment_status || null,
+            records_status: editForm.records_status || null,
+            billing_status: editForm.billing_status || null,
+            signed_lop: editForm.signed_lop,
+            lien_filed: editForm.lien_filed,
+            account_number: editForm.account_number || null,
+            case_provider_financials: [
+              {
+                id: existing?.id ?? "",
+                original_bill: isNaN(savedBill as number) ? null : savedBill,
+                adjusted_bill: existing?.adjusted_bill ?? null,
+                client_paid: existing?.client_paid ?? null,
+                medpay_pip_paid: existing?.medpay_pip_paid ?? null,
+                insurance_paid: existing?.insurance_paid ?? null,
+                still_owed: existing?.still_owed ?? null,
+                paid_plus_owed: isNaN(savedPaid as number) ? null : savedPaid,
+                records_requested_date: existing?.records_requested_date ?? null,
+                records_received_date: existing?.records_received_date ?? null,
+                bills_requested_date: existing?.bills_requested_date ?? null,
+                bills_received_date: existing?.bills_received_date ?? null,
+                lien_notes: existing?.lien_notes ?? null,
+                insurance_notes: existing?.insurance_notes ?? null,
+              },
+            ],
+          };
+        })
+      );
 
       setEditingId(null);
       setEditForm(EMPTY_CASE_PROVIDER_FORM);
@@ -522,12 +564,12 @@ export default function CaseMedicalProvidersTab({
         </div>
       ) : null}
 
-      {initialCaseProviders.length === 0 ? (
+      {caseProviders.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[#d9d9d9] bg-white p-6 text-sm text-[#666666]">
           No providers linked to this case yet.
         </div>
       ) : (
-        initialCaseProviders.map((item) => {
+        caseProviders.map((item) => {
           const provider = getProvider(item.providers);
           const financial = getFinancial(item.case_provider_financials);
 
