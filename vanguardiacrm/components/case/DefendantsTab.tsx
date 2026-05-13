@@ -25,6 +25,16 @@ const EMPTY_FORM: DefendantForm = {
   med_pay_limits: null,
   property_damage_limits: null,
   notes: null,
+  vehicle_year: null,
+  vehicle_make: null,
+  vehicle_model: null,
+  damage_description: null,
+  repair_estimate: null,
+  total_loss: false,
+  rental_coverage: false,
+  rental_daily_rate: null,
+  property_damage_paid: null,
+  property_damage_notes: null,
 }
 
 function formatUSD(value: number | null): string {
@@ -68,7 +78,10 @@ const FIELDS: FieldConfig[] = [
 
 const CURRENCY_KEYS = new Set<keyof DefendantForm>([
   'policy_limits', 'bi_limits', 'um_uim_limits', 'med_pay_limits', 'property_damage_limits',
+  'repair_estimate', 'rental_daily_rate', 'property_damage_paid',
 ])
+
+const BOOLEAN_KEYS = new Set<keyof DefendantForm>(['total_loss', 'rental_coverage'])
 
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   return (
@@ -132,6 +145,102 @@ function DefendantFormFields({
   )
 }
 
+function PropertyDamageFields({
+  form,
+  onChange,
+  onBooleanChange,
+}: {
+  form: DefendantForm
+  onChange: (key: keyof DefendantForm, value: string) => void
+  onBooleanChange: (key: keyof DefendantForm, value: boolean) => void
+}) {
+  function textInput(key: keyof DefendantForm, label: string, span2 = false) {
+    const value = form[key] === null || form[key] === undefined ? '' : String(form[key])
+    return (
+      <div key={key} className={span2 ? 'sm:col-span-2' : ''}>
+        <label className="mb-1 block text-xs font-medium text-[#6b6b6b]">{label}</label>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(key, e.target.value)}
+          className="w-full rounded-md border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
+        />
+      </div>
+    )
+  }
+
+  function currencyInput(key: keyof DefendantForm, label: string) {
+    const value = form[key] === null || form[key] === undefined ? '' : String(form[key])
+    return (
+      <div key={key}>
+        <label className="mb-1 block text-xs font-medium text-[#6b6b6b]">{label}</label>
+        <div className="relative">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#9b9b9b]">$</span>
+          <input
+            type="text"
+            value={value}
+            placeholder="0"
+            onChange={(e) => onChange(key, e.target.value)}
+            className="w-full rounded-md border border-[#e5e5e5] py-2 pl-7 pr-3 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
+          />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-6 border-t border-[#e5e5e5] pt-5">
+      <p className="mb-4 text-sm font-semibold text-[#2b2b2b]">Property Damage</p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {textInput('vehicle_year', 'Vehicle Year')}
+        {textInput('vehicle_make', 'Vehicle Make')}
+        {textInput('vehicle_model', 'Vehicle Model')}
+        {currencyInput('repair_estimate', 'Repair Estimate')}
+        {currencyInput('rental_daily_rate', 'Rental Daily Rate')}
+        {currencyInput('property_damage_paid', 'Property Damage Paid')}
+        <div className="flex items-center gap-6 sm:col-span-2">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-[#2b2b2b]">
+            <input
+              type="checkbox"
+              checked={!!form.total_loss}
+              onChange={(e) => onBooleanChange('total_loss', e.target.checked)}
+              className="h-4 w-4 rounded border-[#d9d9d9] accent-[#1d4f91]"
+            />
+            Total Loss
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-[#2b2b2b]">
+            <input
+              type="checkbox"
+              checked={!!form.rental_coverage}
+              onChange={(e) => onBooleanChange('rental_coverage', e.target.checked)}
+              className="h-4 w-4 rounded border-[#d9d9d9] accent-[#1d4f91]"
+            />
+            Rental Coverage
+          </label>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs font-medium text-[#6b6b6b]">Damage Description</label>
+          <textarea
+            rows={3}
+            value={form.damage_description ?? ''}
+            onChange={(e) => onChange('damage_description', e.target.value)}
+            className="w-full resize-none rounded-md border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs font-medium text-[#6b6b6b]">Property Damage Notes</label>
+          <textarea
+            rows={3}
+            value={form.property_damage_notes ?? ''}
+            onChange={(e) => onChange('property_damage_notes', e.target.value)}
+            className="w-full resize-none rounded-md border border-[#e5e5e5] px-3 py-2 text-sm text-[#2b2b2b] outline-none focus:border-[#1d4f91]"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DefendantCard({
   defendant,
   onSave,
@@ -162,6 +271,10 @@ function DefendantCard({
       ...prev,
       [key]: CURRENCY_KEYS.has(key) ? parseCurrency(value) : (value === '' ? null : value),
     }))
+  }
+
+  function handleBooleanChange(key: keyof DefendantForm, value: boolean) {
+    setForm((prev) => ({ ...prev, [key]: value }))
   }
 
   async function handleSave() {
@@ -273,6 +386,43 @@ function DefendantCard({
               </p>
             )}
           </div>
+
+          <div className="mt-5 border-t border-[#e5e5e5] pt-4">
+            <p className="mb-3 text-sm font-semibold text-[#2b2b2b]">Property Damage</p>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
+              <InfoRow
+                label="Vehicle"
+                value={[defendant.vehicle_year, defendant.vehicle_make, defendant.vehicle_model].filter(Boolean).join(' ') || null}
+              />
+              <InfoRow label="Repair Estimate" value={formatUSD(defendant.repair_estimate)} />
+              <InfoRow label="Property Damage Paid" value={formatUSD(defendant.property_damage_paid)} />
+              <InfoRow label="Rental Daily Rate" value={formatUSD(defendant.rental_daily_rate)} />
+              <div>
+                <p className="text-xs text-[#9b9b9b]">Total Loss</p>
+                <span className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${defendant.total_loss ? 'bg-red-100 text-red-700' : 'bg-[#f3f3f3] text-[#6b6b6b]'}`}>
+                  {defendant.total_loss ? 'Yes' : 'No'}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs text-[#9b9b9b]">Rental Coverage</p>
+                <span className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${defendant.rental_coverage ? 'bg-green-100 text-green-700' : 'bg-[#f3f3f3] text-[#6b6b6b]'}`}>
+                  {defendant.rental_coverage ? 'Yes' : 'No'}
+                </span>
+              </div>
+            </div>
+            {defendant.damage_description && (
+              <div className="mt-3">
+                <p className="text-xs text-[#9b9b9b]">Damage Description</p>
+                <p className="mt-1 rounded-md bg-[#f9f9f9] px-3 py-2 text-sm text-[#2b2b2b]">{defendant.damage_description}</p>
+              </div>
+            )}
+            {defendant.property_damage_notes && (
+              <div className="mt-3">
+                <p className="text-xs text-[#9b9b9b]">Property Damage Notes</p>
+                <p className="mt-1 rounded-md bg-[#f9f9f9] px-3 py-2 text-sm text-[#2b2b2b]">{defendant.property_damage_notes}</p>
+              </div>
+            )}
+          </div>
         </>
       ) : (
         <>
@@ -289,6 +439,7 @@ function DefendantCard({
           </div>
 
           <DefendantFormFields form={form} onChange={handleChange} validationError={validationError} />
+          <PropertyDamageFields form={form} onChange={handleChange} onBooleanChange={handleBooleanChange} />
 
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
@@ -356,6 +507,10 @@ export default function DefendantsTab({ caseId }: Props) {
       ...prev,
       [key]: CURRENCY_KEYS.has(key) ? parseCurrency(value) : (value === '' ? null : value),
     }))
+  }
+
+  function handleAddBooleanChange(key: keyof DefendantForm, value: boolean) {
+    setAddForm((prev) => ({ ...prev, [key]: value }))
   }
 
   async function handleAdd() {
@@ -435,6 +590,7 @@ export default function DefendantsTab({ caseId }: Props) {
         <div className="rounded-xl border border-[#c9daf7] bg-[#f5f8ff] p-5">
           <h3 className="mb-4 text-sm font-semibold text-[#1d4f91]">New Defendant</h3>
           <DefendantFormFields form={addForm} onChange={handleAddChange} validationError={addValidationError} />
+          <PropertyDamageFields form={addForm} onChange={handleAddChange} onBooleanChange={handleAddBooleanChange} />
           {addError && <p className="mt-3 text-sm text-red-600">{addError}</p>}
           <div className="mt-4 flex items-center gap-2">
             <button

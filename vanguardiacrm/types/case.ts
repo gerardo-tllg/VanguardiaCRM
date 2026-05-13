@@ -124,6 +124,16 @@ export type Defendant = {
   med_pay_limits: number | null
   property_damage_limits: number | null
   notes: string | null
+  vehicle_year: string | null
+  vehicle_make: string | null
+  vehicle_model: string | null
+  damage_description: string | null
+  repair_estimate: number | null
+  total_loss: boolean
+  rental_coverage: boolean
+  rental_daily_rate: number | null
+  property_damage_paid: number | null
+  property_damage_notes: string | null
   created_at: string
   updated_at: string
 }
