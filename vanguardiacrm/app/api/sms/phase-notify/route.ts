@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { requireApiUser } from '@/lib/auth/require-api-user'
+import { createClient } from '@/lib/supabase/server'
 
 const PHASE_MESSAGES_EN: Record<string, (name: string) => string> = {
   intake: (name) =>
@@ -39,8 +39,16 @@ const PHASE_MESSAGES_ES: Record<string, (name: string) => string> = {
 
 export async function POST(req: Request) {
   try {
-    const { response } = await requireApiUser()
-    if (response) return response
+    const internalSecret = req.headers.get('x-internal-secret')
+    const isInternalCall = internalSecret === process.env.INTERNAL_API_SECRET
+
+    if (!isInternalCall) {
+      const supabase = await createClient()
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
 
     const { caseId, phase, clientPhone, clientName, language } = await req.json() as {
       caseId: string
