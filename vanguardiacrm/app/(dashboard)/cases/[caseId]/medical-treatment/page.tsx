@@ -137,20 +137,37 @@ export default async function CaseMedicalTreatmentPage({
     console.error("Failed to load case providers:", providersError);
   }
 
-  const { data: providerDirectory, error: directoryError } = await supabaseAdmin
-    .from("providers")
-    .select("*")
-    .order("name", { ascending: true });
+  const providerIds = (caseProviders ?? []).map((p) => p.id);
 
-  if (directoryError) {
-    console.error("Failed to load provider directory:", directoryError);
+  const [financialsResult, directoryResult] = await Promise.all([
+    providerIds.length > 0
+      ? supabaseAdmin
+          .from("case_provider_financials")
+          .select("*")
+          .in("case_provider_id", providerIds)
+      : Promise.resolve({ data: [] }),
+    supabaseAdmin
+      .from("providers")
+      .select("*")
+      .order("name", { ascending: true }),
+  ]);
+
+  if (directoryResult.error) {
+    console.error("Failed to load provider directory:", directoryResult.error);
   }
+
+  const financials = financialsResult.data ?? [];
+
+  const providersWithFinancials = (caseProviders ?? []).map((p) => ({
+    ...p,
+    case_provider_financials: financials.filter((f) => f.case_provider_id === p.id),
+  }));
 
   return (
     <CaseMedicalProvidersTab
       caseNumber={caseId}
-      initialCaseProviders={(caseProviders ?? []) as CaseProviderItem[]}
-      providerDirectory={(providerDirectory ?? []) as ProviderDirectoryItem[]}
+      initialCaseProviders={providersWithFinancials as CaseProviderItem[]}
+      providerDirectory={(directoryResult.data ?? []) as ProviderDirectoryItem[]}
     />
   );
 }

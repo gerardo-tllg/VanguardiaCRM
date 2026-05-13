@@ -69,16 +69,30 @@ export default async function CaseOverviewPage({ params }: PageProps) {
       .select(`
         id, treatment_description, treatment_status,
         first_visit_date, last_visit_date, records_status, billing_status,
-        providers ( name, provider_type, specialty ),
-        case_provider_financials ( original_bill, adjusted_bill, still_owed )
+        providers ( name, provider_type, specialty )
       `)
       .eq("case_id", caseId)
       .order("created_at", { ascending: true }),
   ]);
 
-  console.log('[overview] providers data:', JSON.stringify(providersResult.data, null, 2))
-
   if (caseResult.error || !caseResult.data) notFound();
+
+  const providerIds = (providersResult.data ?? []).map((p) => p.id);
+
+  const { data: financials } = providerIds.length > 0
+    ? await supabaseAdmin
+        .from("case_provider_financials")
+        .select("*")
+        .in("case_provider_id", providerIds)
+    : { data: [] };
+
+  console.log('[overview] providers data:', JSON.stringify(providersResult.data, null, 2))
+  console.log('[overview] financials data:', JSON.stringify(financials, null, 2))
+
+  const providersWithFinancials = (providersResult.data ?? []).map((p) => ({
+    ...p,
+    case_provider_financials: (financials ?? []).filter((f) => f.case_provider_id === p.id),
+  }));
 
   const c = caseResult.data;
   const raw = asRecord(c.raw_payload);
@@ -131,7 +145,7 @@ export default async function CaseOverviewPage({ params }: PageProps) {
         redFlags,
       }}
       defendants={defendantsResult.data ?? []}
-      caseProviders={(providersResult.data ?? []) as CaseProviderRow[]}
+      caseProviders={providersWithFinancials as CaseProviderRow[]}
     />
   );
 }
@@ -146,5 +160,5 @@ export type CaseProviderRow = {
   records_status: string | null
   billing_status: string | null
   providers: { name: string; provider_type: string | null; specialty: string | null } | { name: string; provider_type: string | null; specialty: string | null }[] | null
-  case_provider_financials: { original_bill: number | null; adjusted_bill: number | null; still_owed: number | null }[] | null
+  case_provider_financials: { original_bill: number | null; adjusted_bill: number | null; still_owed: number | null; paid_plus_owed: number | null; client_paid: number | null; medpay_pip_paid: number | null; insurance_paid: number | null }[] | null
 }
