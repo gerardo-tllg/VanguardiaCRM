@@ -38,21 +38,6 @@ function getAuthorLabel(note: Note) {
   return note.author_name || note.created_by || "Unknown";
 }
 
-function parseMentions(text: string): string[] {
-  const matches = text.match(/@([A-Za-z]+(?:\s[A-Za-z]+)?)/g) ?? [];
-  return matches.map((m) => m.slice(1).toLowerCase());
-}
-
-function resolveMentionedUsers(mentions: string[], profiles: Profile[]): Profile[] {
-  return profiles.filter((p) =>
-    mentions.some(
-      (m) =>
-        p.full_name?.toLowerCase().startsWith(m) ||
-        p.email?.toLowerCase().startsWith(m)
-    )
-  );
-}
-
 export default function CaseNotesPanel({
   caseId,
   caseNumber,
@@ -66,12 +51,16 @@ export default function CaseNotesPanel({
   const [error, setError] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
 
-  // Autocomplete state
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [mentionStart, setMentionStart] = useState(0);
-  const [activeIndex, setActiveIndex] = useState(0);
+  // To / CC selector state
+  const [toUserId, setToUserId] = useState<string | null>(null);
+  const [ccUserIds, setCcUserIds] = useState<string[]>([]);
+  const [toOpen, setToOpen] = useState(false);
+  const [ccOpen, setCcOpen] = useState(false);
+  const [toSearch, setToSearch] = useState("");
+  const [ccSearch, setCcSearch] = useState("");
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const toWrapperRef = useRef<HTMLDivElement>(null);
+  const ccWrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/profiles")
@@ -79,6 +68,22 @@ export default function CaseNotesPanel({
       .then((d) => setProfiles(d.profiles ?? []))
       .catch(() => {});
   }, []);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (toOpen && toWrapperRef.current && !toWrapperRef.current.contains(e.target as Node)) {
+        setToOpen(false);
+        setToSearch("");
+      }
+      if (ccOpen && ccWrapperRef.current && !ccWrapperRef.current.contains(e.target as Node)) {
+        setCcOpen(false);
+        setCcSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [toOpen, ccOpen]);
 
   // Realtime subscription — append notes from other users as they arrive
   useEffect(() => {
@@ -100,7 +105,6 @@ export default function CaseNotesPanel({
         },
         (payload) => {
           const note = payload.new as Note;
-          // Own notes are already optimistically added — skip them
           if (currentUserId && note.created_by === currentUserId) return;
           setNotes((prev) => [note, ...prev]);
         }
@@ -110,85 +114,33 @@ export default function CaseNotesPanel({
     return () => { supabase.removeChannel(channel); };
   }, [caseId, supabase]);
 
-  const filteredProfiles =
-    mentionQuery !== null
-      ? profiles
-          .filter((p) => {
-            const q = mentionQuery.toLowerCase();
-            return (
-              p.full_name?.toLowerCase().startsWith(q) ||
-              p.email?.toLowerCase().startsWith(q)
-            );
-          })
-          .slice(0, 6)
-      : [];
+  const toProfile = profiles.find((p) => p.id === toUserId) ?? null;
+  const ccProfiles = profiles.filter((p) => ccUserIds.includes(p.id));
 
-  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const value = e.target.value;
-    setBody(value);
+  const toFiltered = profiles.filter((p) => {
+    const q = toSearch.toLowerCase();
+    return (
+      !q ||
+      p.full_name?.toLowerCase().includes(q) ||
+      p.email?.toLowerCase().includes(q)
+    );
+  }).slice(0, 8);
 
-    const cursor = e.target.selectionStart ?? value.length;
-    const textBeforeCursor = value.slice(0, cursor);
-    const match = textBeforeCursor.match(/@(\w*)$/);
-
-    if (match) {
-      setMentionQuery(match[1]);
-      setMentionStart(cursor - match[0].length);
-      setActiveIndex(0);
-    } else {
-      setMentionQuery(null);
-    }
-  }
-
-  function selectProfile(profile: Profile) {
-    const name = profile.full_name ?? profile.email ?? "";
-    const cursor = textareaRef.current?.selectionStart ?? body.length;
-    const newBody = `${body.slice(0, mentionStart)}@${name} ${body.slice(cursor)}`;
-    setBody(newBody);
-    setMentionQuery(null);
-
-    // Restore focus and place cursor after the inserted name + space
-    setTimeout(() => {
-      const ta = textareaRef.current;
-      if (ta) {
-        const pos = mentionStart + name.length + 2; // @ + name + space
-        ta.focus();
-        ta.setSelectionRange(pos, pos);
-      }
-    }, 0);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (mentionQuery === null || filteredProfiles.length === 0) return;
-
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setActiveIndex((i) => (i + 1) % filteredProfiles.length);
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setActiveIndex((i) => (i - 1 + filteredProfiles.length) % filteredProfiles.length);
-        break;
-      case "Enter":
-      case "Tab":
-        e.preventDefault();
-        selectProfile(filteredProfiles[activeIndex]);
-        break;
-      case "Escape":
-        e.preventDefault();
-        setMentionQuery(null);
-        break;
-    }
-  }
+  const ccFiltered = profiles.filter((p) => {
+    if (ccUserIds.includes(p.id)) return false;
+    const q = ccSearch.toLowerCase();
+    return (
+      !q ||
+      p.full_name?.toLowerCase().includes(q) ||
+      p.email?.toLowerCase().includes(q)
+    );
+  }).slice(0, 8);
 
   async function handleAddNote() {
     const trimmed = body.trim();
     if (!trimmed) return;
 
     setError(null);
-
-    const supabase = createClient();
 
     const {
       data: { user },
@@ -205,6 +157,10 @@ export default function CaseNotesPanel({
       user.user_metadata?.name ||
       user.email ||
       "Staff";
+
+    // Capture selections before resetting
+    const capturedToUserId = toUserId;
+    const capturedCcUserIds = [...ccUserIds];
 
     startTransition(async () => {
       const { data, error } = await supabase
@@ -225,134 +181,192 @@ export default function CaseNotesPanel({
 
       setNotes((prev) => [data as Note, ...prev]);
       setBody("");
+      setToUserId(null);
+      setCcUserIds([]);
 
-      const mentions = parseMentions(trimmed);
-      console.log("[mentions] parsed from note body:", mentions);
-      console.log("[mentions] profiles in state:", profiles.length, profiles.map(p => ({ id: p.id, full_name: p.full_name, email: p.email })));
-
-      if (mentions.length > 0 && profiles.length > 0) {
-        const mentioned = resolveMentionedUsers(mentions, profiles);
-
-        console.log("[mentions] resolved mentionedUsers (excluding self):", mentioned);
-
-        if (mentioned.length > 0) {
-          const payload = {
-            case_id: caseId,
-            note_id: (data as Note).id,
-            mentioned_user_ids: mentioned.map((p) => p.id),
-            mentioner_name: authorName,
-            case_number: caseNumber ?? null,
-          };
-          console.log("[mentions] dispatching to /api/notifications/mention-note:", payload);
-
-          fetch("/api/notifications/mention-note", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-            .then(async (res) => {
-              const body = await res.json().catch(() => null);
-              console.log("[mentions] notification API response:", res.status, body);
-            })
-            .catch((err) => {
-              console.error("[mentions] notification API fetch error:", err);
-            });
-        } else {
-          console.log("[mentions] no mentionedUsers after resolving — dispatch skipped");
-        }
-      } else {
-        console.log("[mentions] dispatch skipped — mentions:", mentions.length, "profiles loaded:", profiles.length);
+      if (capturedToUserId || capturedCcUserIds.length > 0) {
+        fetch("/api/notifications/mention-note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            caseId,
+            noteId: (data as Note).id,
+            noteBody: trimmed,
+            toUserId: capturedToUserId ?? null,
+            ccUserIds: capturedCcUserIds,
+          }),
+        }).catch(() => {});
       }
     });
   }
-
-  const confirmedMentions =
-    profiles.length > 0
-      ? resolveMentionedUsers(parseMentions(body), profiles)
-      : [];
 
   return (
     <aside className="w-full max-w-md rounded-xl border border-[#e5e5e5] bg-white p-4">
       <div className="mb-4">
         <h3 className="text-base font-semibold text-[#2b2b2b]">Case Notes</h3>
-        <p className="mt-1 text-sm text-[#666666]">
-          Internal notes for this case. Use @Name to mention a team member.
-        </p>
+        <p className="mt-1 text-sm text-[#666666]">Internal notes for this case.</p>
       </div>
 
-      <div className="mb-4">
-        <div className="relative">
-          <textarea
-            ref={textareaRef}
-            value={body}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Add a note... Use @Name to mention someone."
-            className="min-h-27.5 w-full rounded-lg border border-[#d9d9d9] p-3 text-sm outline-none focus:border-[#2b2b2b]"
-          />
-
-          {mentionQuery !== null && filteredProfiles.length > 0 && (
-            <ul
-              role="listbox"
-              className="absolute left-0 top-full z-50 mt-1 w-full rounded-lg border border-[#e5e5e5] bg-white shadow-lg"
+      <div className="mb-4 space-y-3">
+        {/* To selector */}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[#6b6b6b]">Notify</label>
+          <div className="relative" ref={toWrapperRef}>
+            <button
+              type="button"
+              onClick={() => { setToOpen((v) => !v); setToSearch(""); }}
+              className="flex w-full items-center justify-between rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-left hover:border-[#d5d5d5]"
             >
-              {filteredProfiles.map((profile, i) => (
-                <li
-                  key={profile.id}
-                  role="option"
-                  aria-selected={i === activeIndex}
-                  onMouseDown={(e) => {
-                    // mousedown fires before blur — prevent textarea losing focus
-                    e.preventDefault();
-                    selectProfile(profile);
-                  }}
-                  onMouseEnter={() => setActiveIndex(i)}
-                  className={[
-                    "flex cursor-pointer items-center justify-between px-3 py-2 text-sm transition-colors first:rounded-t-lg last:rounded-b-lg",
-                    i === activeIndex
-                      ? "bg-[#eef4ff] text-[#1d4f91]"
-                      : "text-[#2b2b2b] hover:bg-[#f7f7f7]",
-                  ].join(" ")}
-                >
-                  <span className="font-medium">
-                    {profile.full_name ?? profile.email}
+              {toProfile ? (
+                <span className="text-[#2b2b2b]">{toProfile.full_name ?? toProfile.email}</span>
+              ) : (
+                <span className="text-[#9b9b9b]">Select staff member...</span>
+              )}
+              <span className="ml-2 flex shrink-0 items-center gap-1">
+                {toProfile && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onMouseDown={(e) => { e.stopPropagation(); setToUserId(null); }}
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-[#9b9b9b] hover:bg-[#f0f0f0] hover:text-[#2b2b2b]"
+                  >
+                    ×
                   </span>
-                  {profile.role && (
-                    <span className="ml-2 shrink-0 text-xs text-[#9b9b9b]">
-                      {ROLE_LABELS[profile.role] ?? profile.role}
-                    </span>
+                )}
+                <svg className="h-4 w-4 text-[#9b9b9b]" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                </svg>
+              </span>
+            </button>
+
+            {toOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-lg border border-[#e5e5e5] bg-white shadow-lg">
+                <div className="border-b border-[#f0f0f0] p-2">
+                  <input
+                    autoFocus
+                    value={toSearch}
+                    onChange={(e) => setToSearch(e.target.value)}
+                    placeholder="Search..."
+                    className="w-full rounded-md border border-[#e5e5e5] px-2 py-1.5 text-xs outline-none focus:border-[#2b2b2b]"
+                  />
+                </div>
+                <ul className="max-h-48 overflow-y-auto">
+                  {toFiltered.length === 0 ? (
+                    <li className="px-3 py-2 text-xs text-[#9b9b9b]">No matches</li>
+                  ) : (
+                    toFiltered.map((p) => (
+                      <li
+                        key={p.id}
+                        onMouseDown={() => { setToUserId(p.id); setToOpen(false); setToSearch(""); }}
+                        className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-[#f7f7f7]"
+                      >
+                        <span className="text-[#2b2b2b]">{p.full_name ?? p.email}</span>
+                        {p.role && (
+                          <span className="ml-2 shrink-0 text-xs text-[#9b9b9b]">
+                            {ROLE_LABELS[p.role] ?? p.role}
+                          </span>
+                        )}
+                      </li>
+                    ))
                   )}
-                </li>
-              ))}
-            </ul>
-          )}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
 
-        {confirmedMentions.length > 0 && mentionQuery === null && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {confirmedMentions.map((p) => (
-              <span
-                key={p.id}
-                className="rounded-full bg-[#eef4ff] px-2 py-0.5 text-xs font-medium text-[#1d4f91]"
-              >
-                {p.full_name ?? p.email}
-              </span>
-            ))}
+        {/* CC selector */}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[#6b6b6b]">CC</label>
+          <div className="relative" ref={ccWrapperRef}>
+            <div
+              className="flex min-h-[38px] cursor-text flex-wrap items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 hover:border-[#d5d5d5]"
+              onMouseDown={(e) => {
+                if ((e.target as HTMLElement).closest("button")) return;
+                setCcOpen(true);
+              }}
+            >
+              {ccProfiles.map((p) => (
+                <span
+                  key={p.id}
+                  className="flex items-center gap-1 rounded-full bg-[#eef4ff] px-2 py-0.5 text-xs font-medium text-[#1d4f91]"
+                >
+                  {p.full_name ?? p.email}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.stopPropagation(); setCcUserIds((prev) => prev.filter((id) => id !== p.id)); }}
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[#1d4f91] hover:bg-[#1d4f91] hover:text-white"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {ccProfiles.length === 0 && (
+                <span className="text-sm text-[#9b9b9b]">Add others...</span>
+              )}
+            </div>
+
+            {ccOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-lg border border-[#e5e5e5] bg-white shadow-lg">
+                <div className="border-b border-[#f0f0f0] p-2">
+                  <input
+                    autoFocus
+                    value={ccSearch}
+                    onChange={(e) => setCcSearch(e.target.value)}
+                    placeholder="Search..."
+                    className="w-full rounded-md border border-[#e5e5e5] px-2 py-1.5 text-xs outline-none focus:border-[#2b2b2b]"
+                  />
+                </div>
+                <ul className="max-h-48 overflow-y-auto">
+                  {ccFiltered.length === 0 ? (
+                    <li className="px-3 py-2 text-xs text-[#9b9b9b]">
+                      {ccSearch ? "No matches" : "All staff already added"}
+                    </li>
+                  ) : (
+                    ccFiltered.map((p) => (
+                      <li
+                        key={p.id}
+                        onMouseDown={() => {
+                          setCcUserIds((prev) => [...prev, p.id]);
+                          setCcSearch("");
+                        }}
+                        className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-[#f7f7f7]"
+                      >
+                        <span className="text-[#2b2b2b]">{p.full_name ?? p.email}</span>
+                        {p.role && (
+                          <span className="ml-2 shrink-0 text-xs text-[#9b9b9b]">
+                            {ROLE_LABELS[p.role] ?? p.role}
+                          </span>
+                        )}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Note textarea */}
+        <div>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Add a note..."
+            className="min-h-[110px] w-full rounded-lg border border-[#e5e5e5] p-3 text-sm outline-none focus:border-[#2b2b2b]"
+          />
+        </div>
 
         <button
           type="button"
           onClick={handleAddNote}
           disabled={isPending || !body.trim()}
-          className="mt-3 rounded-lg bg-[#2b2b2b] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-[#2b2b2b] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending ? "Saving..." : "Add Note"}
         </button>
 
-        {error ? (
-          <p className="mt-2 text-sm text-red-600">{error}</p>
-        ) : null}
+        {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
 
       <div className="space-y-3">
@@ -374,10 +388,7 @@ export default function CaseNotesPanel({
                   {new Date(note.created_at).toLocaleString()}
                 </p>
               </div>
-
-              <p className="whitespace-pre-wrap text-sm text-[#2b2b2b]">
-                {note.body}
-              </p>
+              <p className="whitespace-pre-wrap text-sm text-[#2b2b2b]">{note.body}</p>
             </div>
           ))
         )}

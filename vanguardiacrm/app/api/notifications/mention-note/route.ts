@@ -7,44 +7,84 @@ export async function POST(req: NextRequest) {
   if (response) return response;
 
   const body = await req.json();
-  const { case_id, note_id, mentioned_user_ids, mentioner_name, case_number } = body;
+  const { caseId, noteId, noteBody, toUserId, ccUserIds } = body;
 
-  if (!case_id || !Array.isArray(mentioned_user_ids) || mentioned_user_ids.length === 0) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  if (!caseId) {
+    return NextResponse.json({ error: "caseId is required" }, { status: 400 });
   }
 
-  const mentioner = mentioner_name || user!.email || "A team member";
-  const caseRef = case_number ? `Case #${case_number}` : "a case";
+  const ccList: string[] = Array.isArray(ccUserIds) ? ccUserIds : [];
+  const hasRecipients = toUserId || ccList.length > 0;
 
-  const notificationRows = mentioned_user_ids.map((uid: string) => ({
-    user_id: uid,
-    type: "note_mention",
-    title: `${mentioner} mentioned you`,
-    body: `You were mentioned in a note on ${caseRef}.`,
-    case_id,
-    note_id: note_id ?? null,
-    read: false,
-  }));
+  if (!hasRecipients) {
+    return NextResponse.json({ ok: true });
+  }
 
-  const mentionRows = mentioned_user_ids.map((uid: string) => ({
-    note_id: note_id ?? null,
-    case_id,
-    mentioned_user_id: uid,
-  }));
-
-  const [notifResult, mentionResult] = await Promise.all([
-    supabaseAdmin.from("notifications").insert(notificationRows),
-    note_id
-      ? supabaseAdmin.from("note_mentions").insert(mentionRows)
-      : Promise.resolve({ error: null }),
+  // Look up sender profile name and case number in parallel
+  const [profileResult, caseResult] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", user!.id)
+      .single(),
+    supabaseAdmin
+      .from("cases")
+      .select("case_number")
+      .eq("id", caseId)
+      .single(),
   ]);
 
-  if (notifResult.error) {
-    return NextResponse.json({ error: notifResult.error.message }, { status: 500 });
+  const senderName =
+    profileResult.data?.full_name ??
+    profileResult.data?.email ??
+    user!.email ??
+    "A team member";
+
+  const caseLabel = caseResult.data?.case_number
+    ? `case ${caseResult.data.case_number}`
+    : "a case";
+
+  const noteSnippet =
+    typeof noteBody === "string" ? noteBody.slice(0, 100) : "";
+
+  const rows: {
+    user_id: string;
+    type: string;
+    title: string;
+    body: string;
+    case_id: string;
+    note_id: string | null;
+    read: boolean;
+  }[] = [];
+
+  if (toUserId) {
+    rows.push({
+      user_id: toUserId,
+      type: "note_direct",
+      title: `${senderName} directed a note to you on ${caseLabel}`,
+      body: noteSnippet,
+      case_id: caseId,
+      note_id: noteId ?? null,
+      read: false,
+    });
   }
 
-  if (mentionResult.error) {
-    return NextResponse.json({ error: (mentionResult as { error: { message: string } }).error.message }, { status: 500 });
+  for (const uid of ccList) {
+    rows.push({
+      user_id: uid,
+      type: "note_cc",
+      title: `${senderName} CC'd you on a note for ${caseLabel}`,
+      body: noteSnippet,
+      case_id: caseId,
+      note_id: noteId ?? null,
+      read: false,
+    });
+  }
+
+  const { error } = await supabaseAdmin.from("notifications").insert(rows);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
