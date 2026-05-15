@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Note = {
@@ -24,6 +24,14 @@ type CaseNotesPanelProps = {
   caseId: string;
   caseNumber?: string;
   initialNotes: Note[];
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  attorney: "Attorney",
+  paralegal: "Paralegal",
+  intake: "Intake",
+  staff: "Staff",
 };
 
 function getAuthorLabel(note: Note) {
@@ -56,12 +64,91 @@ export default function CaseNotesPanel({
   const [error, setError] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
 
+  // Autocomplete state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStart, setMentionStart] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   useEffect(() => {
     fetch("/api/profiles")
       .then((r) => r.json())
       .then((d) => setProfiles(d.profiles ?? []))
       .catch(() => {});
   }, []);
+
+  const filteredProfiles =
+    mentionQuery !== null
+      ? profiles
+          .filter((p) => {
+            const q = mentionQuery.toLowerCase();
+            return (
+              p.full_name?.toLowerCase().startsWith(q) ||
+              p.email?.toLowerCase().startsWith(q)
+            );
+          })
+          .slice(0, 6)
+      : [];
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value;
+    setBody(value);
+
+    const cursor = e.target.selectionStart ?? value.length;
+    const textBeforeCursor = value.slice(0, cursor);
+    const match = textBeforeCursor.match(/@(\w*)$/);
+
+    if (match) {
+      setMentionQuery(match[1]);
+      setMentionStart(cursor - match[0].length);
+      setActiveIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
+  }
+
+  function selectProfile(profile: Profile) {
+    const name = profile.full_name ?? profile.email ?? "";
+    const cursor = textareaRef.current?.selectionStart ?? body.length;
+    const newBody = `${body.slice(0, mentionStart)}@${name} ${body.slice(cursor)}`;
+    setBody(newBody);
+    setMentionQuery(null);
+
+    // Restore focus and place cursor after the inserted name + space
+    setTimeout(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        const pos = mentionStart + name.length + 2; // @ + name + space
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      }
+    }, 0);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentionQuery === null || filteredProfiles.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setActiveIndex((i) => (i + 1) % filteredProfiles.length);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setActiveIndex((i) => (i - 1 + filteredProfiles.length) % filteredProfiles.length);
+        break;
+      case "Enter":
+      case "Tab":
+        e.preventDefault();
+        selectProfile(filteredProfiles[activeIndex]);
+        break;
+      case "Escape":
+        e.preventDefault();
+        setMentionQuery(null);
+        break;
+    }
+  }
 
   async function handleAddNote() {
     const trimmed = body.trim();
@@ -130,7 +217,7 @@ export default function CaseNotesPanel({
     });
   }
 
-  const activeMentions =
+  const confirmedMentions =
     profiles.length > 0
       ? resolveMentionedUsers(parseMentions(body), profiles)
       : [];
@@ -145,16 +232,56 @@ export default function CaseNotesPanel({
       </div>
 
       <div className="mb-4">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Add a note... Use @Name to mention someone."
-          className="min-h-27.5 w-full rounded-lg border border-[#d9d9d9] p-3 text-sm outline-none focus:border-[#2b2b2b]"
-        />
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={body}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Add a note... Use @Name to mention someone."
+            className="min-h-27.5 w-full rounded-lg border border-[#d9d9d9] p-3 text-sm outline-none focus:border-[#2b2b2b]"
+          />
 
-        {activeMentions.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {activeMentions.map((p) => (
+          {mentionQuery !== null && filteredProfiles.length > 0 && (
+            <ul
+              role="listbox"
+              className="absolute left-0 top-full z-50 mt-1 w-full rounded-lg border border-[#e5e5e5] bg-white shadow-lg"
+            >
+              {filteredProfiles.map((profile, i) => (
+                <li
+                  key={profile.id}
+                  role="option"
+                  aria-selected={i === activeIndex}
+                  onMouseDown={(e) => {
+                    // mousedown fires before blur — prevent textarea losing focus
+                    e.preventDefault();
+                    selectProfile(profile);
+                  }}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  className={[
+                    "flex cursor-pointer items-center justify-between px-3 py-2 text-sm transition-colors first:rounded-t-lg last:rounded-b-lg",
+                    i === activeIndex
+                      ? "bg-[#eef4ff] text-[#1d4f91]"
+                      : "text-[#2b2b2b] hover:bg-[#f7f7f7]",
+                  ].join(" ")}
+                >
+                  <span className="font-medium">
+                    {profile.full_name ?? profile.email}
+                  </span>
+                  {profile.role && (
+                    <span className="ml-2 shrink-0 text-xs text-[#9b9b9b]">
+                      {ROLE_LABELS[profile.role] ?? profile.role}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {confirmedMentions.length > 0 && mentionQuery === null && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {confirmedMentions.map((p) => (
               <span
                 key={p.id}
                 className="rounded-full bg-[#eef4ff] px-2 py-0.5 text-xs font-medium text-[#1d4f91]"
