@@ -9,7 +9,6 @@ type Props = {
   clientPhone: string
 }
 
-const POLL_INTERVAL_MS = 30_000
 const SMS_CHAR_LIMIT = 160
 
 function formatTime(iso: string): string {
@@ -92,10 +91,30 @@ export default function SMSInbox({ caseId, clientPhone }: Props) {
     init()
   }, [fetchMessages])
 
+  // Realtime subscription — append inbound messages as they arrive
   useEffect(() => {
-    const id = setInterval(fetchMessages, POLL_INTERVAL_MS)
-    return () => clearInterval(id)
-  }, [fetchMessages])
+    const channel = supabase
+      .channel(`sms_inbox_${caseId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sms_messages',
+          filter: `case_id=eq.${caseId}`,
+        },
+        (payload) => {
+          const row = payload.new as SMSMessage
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === row.id)) return prev
+            return [...prev, row]
+          })
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [caseId, supabase])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })

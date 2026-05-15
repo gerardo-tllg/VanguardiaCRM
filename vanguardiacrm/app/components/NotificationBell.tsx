@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 type Notification = {
   id: string;
@@ -25,6 +26,8 @@ function timeAgo(iso: string): string {
 
 export default function NotificationBell() {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -38,15 +41,42 @@ export default function NotificationBell() {
       setNotifications(data.notifications ?? []);
       setUnreadCount(data.unread_count ?? 0);
     } catch {
-      // silent — bell is non-critical
+      // non-critical
     }
   }
 
+  // Initial load + Realtime subscription for INSERT events
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, []);
+
+    let channelCleanup: (() => void) | null = null;
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+
+      const channel = supabase
+        .channel(`notifications_user_${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const n = payload.new as Notification;
+            setNotifications((prev) => [n, ...prev].slice(0, 20));
+            setUnreadCount((c) => c + 1);
+          }
+        )
+        .subscribe();
+
+      channelCleanup = () => supabase.removeChannel(channel);
+    });
+
+    return () => channelCleanup?.();
+  }, [supabase]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Note = {
@@ -58,6 +58,8 @@ export default function CaseNotesPanel({
   caseNumber,
   initialNotes,
 }: CaseNotesPanelProps) {
+  const supabase = useMemo(() => createClient(), []);
+
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [body, setBody] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -77,6 +79,36 @@ export default function CaseNotesPanel({
       .then((d) => setProfiles(d.profiles ?? []))
       .catch(() => {});
   }, []);
+
+  // Realtime subscription — append notes from other users as they arrive
+  useEffect(() => {
+    let currentUserId: string | null = null;
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      currentUserId = user?.id ?? null;
+    });
+
+    const channel = supabase
+      .channel(`case_notes_${caseId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "case_notes",
+          filter: `case_id=eq.${caseId}`,
+        },
+        (payload) => {
+          const note = payload.new as Note;
+          // Own notes are already optimistically added — skip them
+          if (currentUserId && note.created_by === currentUserId) return;
+          setNotes((prev) => [note, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [caseId, supabase]);
 
   const filteredProfiles =
     mentionQuery !== null
