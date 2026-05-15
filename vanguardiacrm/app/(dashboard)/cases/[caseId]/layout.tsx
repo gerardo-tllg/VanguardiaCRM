@@ -81,7 +81,7 @@ export default async function CaseLayout({
 
       <div className="flex flex-1 gap-6 p-6">
         <main className="min-w-0 flex-1">{children}</main>
-        <CaseNotesPanel caseId={caseRecord.id} initialNotes={notes ?? []} />
+        <CaseNotesPanel caseId={caseRecord.id} caseNumber={caseRecord.case_number ?? undefined} initialNotes={notes ?? []} />
       </div>
     </div>
   );

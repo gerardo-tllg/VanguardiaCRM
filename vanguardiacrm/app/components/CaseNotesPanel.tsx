@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Note = {
@@ -13,8 +13,16 @@ type Note = {
   author_name?: string | null;
 };
 
+type Profile = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string | null;
+};
+
 type CaseNotesPanelProps = {
   caseId: string;
+  caseNumber?: string;
   initialNotes: Note[];
 };
 
@@ -22,14 +30,38 @@ function getAuthorLabel(note: Note) {
   return note.author_name || note.created_by || "Unknown";
 }
 
+function parseMentions(text: string): string[] {
+  const matches = text.match(/@([A-Za-z]+(?:\s[A-Za-z]+)?)/g) ?? [];
+  return matches.map((m) => m.slice(1).toLowerCase());
+}
+
+function resolveMentionedUsers(mentions: string[], profiles: Profile[]): Profile[] {
+  return profiles.filter((p) =>
+    mentions.some(
+      (m) =>
+        p.full_name?.toLowerCase().startsWith(m) ||
+        p.email?.toLowerCase().startsWith(m)
+    )
+  );
+}
+
 export default function CaseNotesPanel({
   caseId,
+  caseNumber,
   initialNotes,
 }: CaseNotesPanelProps) {
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [body, setBody] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+
+  useEffect(() => {
+    fetch("/api/profiles")
+      .then((r) => r.json())
+      .then((d) => setProfiles(d.profiles ?? []))
+      .catch(() => {});
+  }, []);
 
   async function handleAddNote() {
     const trimmed = body.trim();
@@ -74,15 +106,41 @@ export default function CaseNotesPanel({
 
       setNotes((prev) => [data as Note, ...prev]);
       setBody("");
+
+      const mentions = parseMentions(trimmed);
+      if (mentions.length > 0 && profiles.length > 0) {
+        const mentioned = resolveMentionedUsers(mentions, profiles).filter(
+          (p) => p.id !== user.id
+        );
+
+        if (mentioned.length > 0) {
+          fetch("/api/notifications/mention-note", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              case_id: caseId,
+              note_id: (data as Note).id,
+              mentioned_user_ids: mentioned.map((p) => p.id),
+              mentioner_name: authorName,
+              case_number: caseNumber ?? null,
+            }),
+          }).catch(() => {});
+        }
+      }
     });
   }
+
+  const activeMentions =
+    profiles.length > 0
+      ? resolveMentionedUsers(parseMentions(body), profiles)
+      : [];
 
   return (
     <aside className="w-full max-w-md rounded-xl border border-[#e5e5e5] bg-white p-4">
       <div className="mb-4">
         <h3 className="text-base font-semibold text-[#2b2b2b]">Case Notes</h3>
         <p className="mt-1 text-sm text-[#666666]">
-          Internal notes for this case.
+          Internal notes for this case. Use @Name to mention a team member.
         </p>
       </div>
 
@@ -90,9 +148,23 @@ export default function CaseNotesPanel({
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Add a note..."
+          placeholder="Add a note... Use @Name to mention someone."
           className="min-h-27.5 w-full rounded-lg border border-[#d9d9d9] p-3 text-sm outline-none focus:border-[#2b2b2b]"
         />
+
+        {activeMentions.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {activeMentions.map((p) => (
+              <span
+                key={p.id}
+                className="rounded-full bg-[#eef4ff] px-2 py-0.5 text-xs font-medium text-[#1d4f91]"
+              >
+                {p.full_name ?? p.email}
+              </span>
+            ))}
+          </div>
+        )}
+
         <button
           type="button"
           onClick={handleAddNote}

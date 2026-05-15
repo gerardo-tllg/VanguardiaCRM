@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import GlobalCaseSearch from "./GlobalCaseSearch";
+import NotificationBell from "./NotificationBell";
 
 export default function Topbar() {
   const router = useRouter();
@@ -20,12 +21,15 @@ export default function Topbar() {
         <GlobalCaseSearch />
       </div>
 
-      <button
-        onClick={handleSignOut}
-        className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
-      >
-        Sign Out
-      </button>
+      <div className="flex items-center gap-3">
+        <NotificationBell />
+        <button
+          onClick={handleSignOut}
+          className="rounded-md border border-[#d9d9d9] bg-white px-4 py-2 text-sm font-medium text-[#2b2b2b] hover:bg-[#f7f7f7]"
+        >
+          Sign Out
+        </button>
+      </div>
     </header>
   );
 }
