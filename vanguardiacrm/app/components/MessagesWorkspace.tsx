@@ -206,7 +206,21 @@ export default function MessagesWorkspace() {
     if (!selectedPhone) return
     fetchThread(selectedPhone)
     setUnread((prev) => ({ ...prev, [selectedPhone]: 0 }))
-  }, [selectedPhone, fetchThread])
+
+    // Mark all inbound messages from this phone as read
+    const norm = normalizeToE164(selectedPhone)
+    const digits10 = norm.replace(/^\+1/, '')
+    const phoneFilters = [`from_number.eq.${norm}`]
+    if (digits10 !== norm) phoneFilters.push(`from_number.eq.${digits10}`)
+
+    supabase
+      .from("sms_messages")
+      .update({ read: true })
+      .or(phoneFilters.join(","))
+      .eq("direction", "inbound")
+      .eq("read", false)
+      .then(() => {})
+  }, [selectedPhone, fetchThread, supabase])
 
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" })

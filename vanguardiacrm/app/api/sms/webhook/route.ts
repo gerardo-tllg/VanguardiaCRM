@@ -62,6 +62,7 @@ export async function POST(req: Request) {
       sent_at: new Date().toISOString(),
       channel,
       via_number: to,
+      read: false,
     })
 
     // Backfill any prior messages from this number that were saved without a case_id
