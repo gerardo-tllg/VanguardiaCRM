@@ -227,24 +227,43 @@ export default function CaseNotesPanel({
       setBody("");
 
       const mentions = parseMentions(trimmed);
+      console.log("[mentions] parsed from note body:", mentions);
+      console.log("[mentions] profiles in state:", profiles.length, profiles.map(p => ({ id: p.id, full_name: p.full_name, email: p.email })));
+
       if (mentions.length > 0 && profiles.length > 0) {
         const mentioned = resolveMentionedUsers(mentions, profiles).filter(
           (p) => p.id !== user.id
         );
 
+        console.log("[mentions] resolved mentionedUsers (excluding self):", mentioned);
+
         if (mentioned.length > 0) {
+          const payload = {
+            case_id: caseId,
+            note_id: (data as Note).id,
+            mentioned_user_ids: mentioned.map((p) => p.id),
+            mentioner_name: authorName,
+            case_number: caseNumber ?? null,
+          };
+          console.log("[mentions] dispatching to /api/notifications/mention-note:", payload);
+
           fetch("/api/notifications/mention-note", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              case_id: caseId,
-              note_id: (data as Note).id,
-              mentioned_user_ids: mentioned.map((p) => p.id),
-              mentioner_name: authorName,
-              case_number: caseNumber ?? null,
-            }),
-          }).catch(() => {});
+            body: JSON.stringify(payload),
+          })
+            .then(async (res) => {
+              const body = await res.json().catch(() => null);
+              console.log("[mentions] notification API response:", res.status, body);
+            })
+            .catch((err) => {
+              console.error("[mentions] notification API fetch error:", err);
+            });
+        } else {
+          console.log("[mentions] no mentionedUsers after resolving — dispatch skipped");
         }
+      } else {
+        console.log("[mentions] dispatch skipped — mentions:", mentions.length, "profiles loaded:", profiles.length);
       }
     });
   }
