@@ -231,9 +231,7 @@ export default function CaseNotesPanel({
       console.log("[mentions] profiles in state:", profiles.length, profiles.map(p => ({ id: p.id, full_name: p.full_name, email: p.email })));
 
       if (mentions.length > 0 && profiles.length > 0) {
-        const mentioned = resolveMentionedUsers(mentions, profiles).filter(
-          (p) => p.id !== user.id
-        );
+        const mentioned = resolveMentionedUsers(mentions, profiles);
 
         console.log("[mentions] resolved mentionedUsers (excluding self):", mentioned);
 

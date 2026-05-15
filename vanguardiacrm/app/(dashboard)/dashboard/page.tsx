@@ -162,7 +162,7 @@ export default async function DashboardPage() {
             { label: "New Leads",           value: newLeadsCount,     fmt: "number", href: "/leads"                     },
             { label: "Cases This Month",    value: thisMonthCount,    fmt: "number", href: "/cases"                     },
             { label: "Total Medical Billed",value: totalBilled,       fmt: "usd",    href: null                         },
-            { label: "In Negotiation",      value: negotiationCount,  fmt: "number", href: "/cases?phase=negotiation"   },
+            { label: "In Negotiation",      value: negotiationCount,  fmt: "number", href: "/cases"                     },
           ] as const
         ).map((stat) => {
           const display = stat.fmt === "usd" ? formatUSD(stat.value) : stat.value;
@@ -200,7 +200,7 @@ export default async function DashboardPage() {
           {PHASES.map((phase) => (
             <Link
               key={phase.status}
-              href={`/cases?phase=${phase.status}`}
+              href="/cases"
               className="flex items-center gap-2 rounded-lg border border-[#e5e5e5] px-3 py-2 transition hover:border-[#d5d5d5] hover:bg-[#fafafa]"
             >
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${phase.badge}`}>
